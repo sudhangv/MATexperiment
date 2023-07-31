@@ -24,8 +24,9 @@ REPUMP_FREQUENCY = 384228.6 + 6.56
 SAMPLE_RATE = 2000
 
 # TODO: find a better place for this
-MEASURE_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun6'
-WDATA_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun3\testCATrun6.csv'
+EXP_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements'
+MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testCATRun7')
+WDATA_FOLDER =os.path.join(MEASURE_FOLDER, 'testCATrun7.csv')
 
 # TODO: maybe make a run analysis class out of this?
 
@@ -167,14 +168,34 @@ def add_wavemeter_data(df, wmeter_csv_path, window_size=100, num_rows=50):
 
 	return unique_levels, freq_data, max_freq, min_freq
 
-def plot_results(df, max_freq, min_freq):
+def plot_results(dfs, max_freq, min_freq=0.0, mfc='red', fmt='o'):
 	FREQVSVOLT = 214.0 
 	
-	plt.errorbar((max_freq-PUMP_FREQUENCY)-df['tempV']*FREQVSVOLT, df['ratio'], yerr=df['ratioErr'], fmt='o', ms=4, mfc='red')
-	plt.ylabel(r'$\mathbf{\frac{V_{ss, cat}}{V_{ss}}} $ ')
-	plt.xlabel(r'$\Delta $ (GHz)', fontdict={'weight':'bold'})
+	if not hasattr(dfs, '__iter__'):
+		dfs=[dfs]
+	plt.gcf().set_dpi(300)
 	
+	for df in dfs:
+		plt.errorbar((max_freq-PUMP_FREQUENCY)-df['tempV']*FREQVSVOLT, df['ratio'], yerr=df['ratioErr'], fmt=fmt, ms=4, mfc=mfc)
+		plt.ylabel(r'$\mathbf{\frac{V_{ss, cat}}{V_{ss}}} $ ')
+		plt.xlabel(r'$\Delta $ (GHz)', fontdict={'weight':'bold'})
 	
+	plt.show()
+	
+def plot_polyfit(x_data, y_data, spline_degree):
+	
+	coefficients = np.polyfit(x_data, y_data, spline_degree)
+
+	x_interp = np.linspace(min(x_data), max(x_data), 100)
+	y_interp = np.polyval(coefficients, x_interp)
+
+	plt.scatter(x_data, y_data, label='Original Data')
+	plt.plot(x_interp, y_interp, label='Polynomial Interpolation (Degree={})'.format(spline_degree))
+
+def dump():
+	folders = [os.path.join(EXP_FOLDER, path ) for path in ['testCATRun4', 'testCATRun5', 'testCATRun6', 'testCATRun7']]
+	dfs = [get_data_frame(measure_folder) for measure_folder in folders]
+ 
 if __name__ == '__main__':
 	run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun3\16-07-11"
 	filename = os.path.join(run_path, 'data.csv')
