@@ -602,6 +602,7 @@ class MTdataHost:
         
     def setReloadVolt(self, timeBuffer):
         
+        linear_fit = False
         tStart = self.setDeloadEnd(timeBuffer)
         timeDiff = 20*timeBuffer
         
@@ -617,17 +618,27 @@ class MTdataHost:
         
         fitVals, fitUnc, voltVals = self.fitExp(reloadTime, reloadVoltage)
 
+        if max(fitUnc/fitVals) > 1:
+            fitVals, fitUnc, voltVals = self.fitLinear(reloadTime, reloadVoltage)
+            linear_fit = True
         self.reloadFitVoltage = voltVals
         
 
         def exp(t, V_0, A, gamma):
             return V_0 + A*(1 - np.exp(-gamma*t))
         
+        def linear(x, m, b):
+            return m*x + b
         # extrapolate back to when deload stage ends
         
-        self.reloadVolt = exp(-timeDiff, *fitVals) - self.baseVolt
+        if linear_fit:
+            self.reloadVolt = linear(-timeDiff, *fitVals) - self.baseVolt
+        else:    
+            self.reloadVolt = exp(-timeDiff, *fitVals) - self.baseVolt
+            
         self.reloadVoltpt, self.reloadVoltT = self.reloadVolt + self.baseVolt, tStart
         self.reloadVoltErr = ((fitUnc[0]*timeDiff)**2 + fitUnc[1]**2 + self.BaseVoltErr**2)**(0.5)
+        self.linear_reload_fit = linear_fit
 
     def setDeloading(self, timeBuffer):
         

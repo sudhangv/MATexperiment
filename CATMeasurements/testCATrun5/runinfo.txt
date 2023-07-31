@@ -1,0 +1,1 @@
+Run at lower CAT current (750 mA)
