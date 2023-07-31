@@ -1,0 +1,1 @@
+Run at higher CAT current (1050 mA)

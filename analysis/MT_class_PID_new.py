@@ -10,6 +10,8 @@ Created on Fri Jul 19 2019
 # data from the ADC and a .txt file containing all settings contained
 # in MT_settings.py at the time of the run. 
 
+# TODO: store starting and ending indices instead of phases instead of data itself?
+
 import numpy as np
 from numpy.testing._private.utils import assert_allclose
 from scipy.optimize import curve_fit, minimize
@@ -643,7 +645,7 @@ class MTdataHost:
     def setDeloading(self, timeBuffer):
         
         # sets the start and end time based upon the timing of the previous sequences
-        tStart = self.tDeload + 5*timeBuffer
+        tStart = self.tDeload + 15*timeBuffer
 
         tEnd1 = tStart + self.timeDeload - 10*timeBuffer
         tEnd2 = tStart + self.timeDeload + 10*timeBuffer
@@ -651,48 +653,48 @@ class MTdataHost:
         end1, end2 = self.getTimeInd(tEnd1), self.getTimeInd(tEnd2)
 
         startInd = self.getTimeInd(tStart)
-        endInd = end1 + np.argmin(abs(self.voltage[end1:end2]))-1
+        endInd = end1 
         
-        self.deloadingVoltage = self.voltage[startInd:endInd]
-        self.deloadingTime = self.time[startInd:endInd]
+        self.deloadVoltage = self.voltage[startInd:endInd]
+        self.deloadTime = self.time[startInd:endInd]
 
         # fit loading rate to exponential model
-        def deloadModel(t, gamma, betaf, R, N0):
-            t1 = np.sqrt(4*R*betaf + gamma**2)
-            t2 = gamma + 2*betaf*N0
-            result = -gamma/(2*betaf) + t1*np.tanh(0.5*t*t1+np.atanh(t2/t1))/(2*betaf)
-            return result
+        # def deloadModel(t, gamma, betaf, R, N0):
+        #     t1 = np.sqrt(4*R*betaf + gamma**2)
+        #     t2 = gamma + 2*betaf*N0
+        #     result = -gamma/(2*betaf) + t1*np.tanh(0.5*t*t1+np.atanh(t2/t1))/(2*betaf)
+        #     return result
 
-        # TODO from here onwards
-        popt,pcov = curve_fit(deloadModel,
-                    self.deloadingTime - self.deloadingTime[0], 
-                    self.deloadingVoltage, 
-                    sigma = [self.std]*len(self.deloadingVoltage), 
-                    absolute_sigma=True, 
-                    maxfev = 10**5,
-                    p0 = [0.05, 0.3, 0.5])
-        fitUnc = np.sqrt(np.diag(pcov))
+        # # TODO from here onwards
+        # popt,pcov = curve_fit(deloadModel,
+        #             self.deloadingTime - self.deloadingTime[0], 
+        #             self.deloadingVoltage, 
+        #             sigma = [self.std]*len(self.deloadingVoltage), 
+        #             absolute_sigma=True, 
+        #             maxfev = 10**5,
+        #             p0 = [0.05, 0.3, 0.5])
+        # fitUnc = np.sqrt(np.diag(pcov))
 
-        # set deload rate constants
-        self.motA = popt[1]
-        self.motR, self.motRErr = popt[2], fitUnc[2]
-        self.motFitR = popt[1]*popt[2]
-        self.motFitRErr = self.motFitR*np.sqrt((fitUnc[2]/popt[2])**2 + (fitUnc[1]/popt[1])**2)
-        self.motFit = exp(self.loadingTime - self.loadingTime[0], *popt)
+        # # set deload rate constants
+        # self.motA = popt[1]
+        # self.motR, self.motRErr = popt[2], fitUnc[2]
+        # self.motFitR = popt[1]*popt[2]
+        # self.motFitRErr = self.motFitR*np.sqrt((fitUnc[2]/popt[2])**2 + (fitUnc[1]/popt[1])**2)
+        # self.motFit = exp(self.loadingTime - self.loadingTime[0], *popt)
         
     
 
-        # taking last point of fitting exponential to be the MOT SS value
-        if self.bkBool:
-            self.motSS = exp(self.loadingTime - self.loadingTime[0], *popt)[-1]
-            #self.motSS = np.average(((self.loadingVoltage - self.bkFl) - (self.bkVoltage[startInd:endInd] - self.bkbase)*self.prop)[-100:])
-            self.motSSErr = (fitUnc[0]**2 + fitUnc[1]**2)**(0.5)
-            if self.motSSErr / self.motSS > 0.01:
-                self.motSSErr = self.motSS*0.01
-        else:
-            self.motSS = exp(self.loadingTime - self.loadingTime[0], *popt)[-1] - self.baseVolt
-            #self.motSS = np.average(self.loadingVoltage[-100:])- self.baseVolt
-            self.motSSErr = (fitUnc[0]**2 + fitUnc[1]**2 + self.BaseVoltErr**2)**(0.5)
+        # # taking last point of fitting exponential to be the MOT SS value
+        # if self.bkBool:
+        #     self.motSS = exp(self.loadingTime - self.loadingTime[0], *popt)[-1]
+        #     #self.motSS = np.average(((self.loadingVoltage - self.bkFl) - (self.bkVoltage[startInd:endInd] - self.bkbase)*self.prop)[-100:])
+        #     self.motSSErr = (fitUnc[0]**2 + fitUnc[1]**2)**(0.5)
+        #     if self.motSSErr / self.motSS > 0.01:
+        #         self.motSSErr = self.motSS*0.01
+        # else:
+        #     self.motSS = exp(self.loadingTime - self.loadingTime[0], *popt)[-1] - self.baseVolt
+        #     #self.motSS = np.average(self.loadingVoltage[-100:])- self.baseVolt
+        #     self.motSSErr = (fitUnc[0]**2 + fitUnc[1]**2 + self.BaseVoltErr**2)**(0.5)
     def setAll(self, timeBuffer):
         '''
         Sets all of the relevant parameters, as well as the 'ratio' variable, which is the recaptured fraction
@@ -729,8 +731,7 @@ class MTdataHost:
         self.setBaseline(timeBuffer)
 
         self.setLoading(timeBuffer)
-        
-        #self.setDeloading(timeBuffer)   # TODO:
+        self.setDeloading(timeBuffer)   # TODO: currently just stores the deloading times and voltages
         self.setReloadVolt(timeBuffer)
 
         self.initFit, self.initX = self.setInitialLoad(timeBuffer)
@@ -801,6 +802,9 @@ class MTdataHost:
             plt.savefig(os.path.join(dirName,'baselineFit.png'), dpi=200)
             plt.close()
             
+            plt.plot(self.deloadTime,self.deloadVoltage)
+            plt.savefig(os.path.join(dirName,'deloadPhase.png'), dpi=200)
+            plt.close()
         
         
 class fitter:

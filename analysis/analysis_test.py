@@ -24,8 +24,8 @@ REPUMP_FREQUENCY = 384228.6 + 6.56
 SAMPLE_RATE = 2000
 
 # TODO: find a better place for this
-MEASURE_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun3'
-WDATA_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun3\testCATrun3.csv'
+MEASURE_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun6'
+WDATA_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun3\testCATrun6.csv'
 
 # TODO: maybe make a run analysis class out of this?
 
@@ -118,7 +118,7 @@ def extract_fit(run_path, plot=True, cache_failed=True, cache_all=True):
 
 def get_row(run_path, **kwargs):
 			
-   fit_results, settings, timestamp = extract_fit(run_path, cache_all=False, **kwargs)
+   fit_results, settings, timestamp = extract_fit(run_path, **kwargs)
    row = {**fit_results, **settings, **{'timestamp':timestamp}}
    
    return row
@@ -137,11 +137,9 @@ def get_data_frame(data_dir, parallel=True, in_process_run=False, **kwargs):
 
 	run_path_arr = sorted(run_path_arr)
 	
-	# def _get_row(run_path):
-	# 	return get_row(run_path, **kwargs)
 	if parallel:
 		with Pool(4) as p:
-			rows = list(tqdm(p.imap(get_row, run_path_arr), total=len(run_path_arr)))
+			rows = list(tqdm(p.imap(partial(get_row, **kwargs), run_path_arr), total=len(run_path_arr)))
 	
 	else:
 		for run_path in tqdm(run_path_arr):
@@ -166,14 +164,16 @@ def add_wavemeter_data(df, wmeter_csv_path, window_size=100, num_rows=50):
 	min_freq = freq_data.min()
   
 	unique_levels = np.linspace(min_freq, max_freq, num_rows)[::-1]
-	#rolling_mean = wdata.iloc[:, 0].rolling(window=window_size, min_periods=1).mean()
-	# threshold = 1.0 
-	# change_points = freq_data[np.abs(freq_data[:-10] - freq_data[10:]) > threshold]
-	# unique_levels = change_points.unique()
 
-	#  DEBUGGING 
-	return unique_levels, freq_data
+	return unique_levels, freq_data, max_freq, min_freq
 
+def plot_results(df, max_freq, min_freq):
+	FREQVSVOLT = 214.0 
+	
+	plt.errorbar((max_freq-PUMP_FREQUENCY)-df['tempV']*FREQVSVOLT, df['ratio'], yerr=df['ratioErr'], fmt='o', ms=4, mfc='red')
+	plt.ylabel(r'$\mathbf{\frac{V_{ss, cat}}{V_{ss}}} $ ')
+	plt.xlabel(r'$\Delta $ (GHz)', fontdict={'weight':'bold'})
+	
 	
 if __name__ == '__main__':
 	run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testCATRun3\16-07-11"
