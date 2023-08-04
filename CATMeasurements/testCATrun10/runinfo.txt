@@ -1,0 +1,2 @@
+TD test run: TA current at 1050mA, pump intensity is max, detuning = -12MHz. Starting freq = 384266.5 GHz. 
+ This is to look at the ratio being > 1 for detuning around 20 GHz
