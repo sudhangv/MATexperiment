@@ -465,10 +465,10 @@ class MTdataHost:
 
 		# if 1/10 of the associated half-life is too large, then fit over a range 0.5 s
 		# this only seems to have an influence on very small MOTs
-		if 1/self.motR*0.1 < 0.075:
+		if (1/self.motR)*0.1 < 1:
 			tEnd = tStart + 1/self.motR*0.1
 		else:
-			tEnd = tStart + 0.075 # use 0.1 for high, 0.5 for low
+			tEnd = tStart + 20 # use 0.1 for high, 0.5 for low
 	
 		startInd, endInd = self.getTimeInd(tStart), self.getTimeInd(tEnd)
 		self.initStartInd, self.initEndInd = startInd, endInd
