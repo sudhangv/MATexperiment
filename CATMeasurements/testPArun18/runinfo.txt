@@ -1,0 +1,1 @@
+PA test run 18: zooming in ~-52Ghz  to -47 Ghz (2.7 mW/cm^2, -8 MHz). TA current is 1500 mA. 

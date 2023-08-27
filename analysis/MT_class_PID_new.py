@@ -468,7 +468,7 @@ class MTdataHost:
 		if (1/self.motR)*0.1 < 1:
 			tEnd = tStart + 1/self.motR*0.1
 		else:
-			tEnd = tStart + 20 # use 0.1 for high, 0.5 for low
+			tEnd = tStart + 2 # use 0.1 for high, 0.5 for low
 	
 		startInd, endInd = self.getTimeInd(tStart), self.getTimeInd(tEnd)
 		self.initStartInd, self.initEndInd = startInd, endInd
@@ -824,6 +824,13 @@ class MTdataHost:
 			
 			plt.plot(self.deloadTime,self.deloadVoltage)
 			plt.savefig(os.path.join(dirName,'deloadPhase.png'), dpi=200)
+			plt.close()
+
+			ind1 = int(self.initTime[0]*2000)
+			ind2 = ind1 + len(self.initTime)
+			plt.plot(self.initTime, self.voltage[ind1:ind2+1][:len(self.initTime)])
+			plt.plot(self.initTime, self.initFit[2])
+			plt.savefig(os.path.join(dirName,'initFit.png'), dpi=200)
 			plt.close()
 		
 		

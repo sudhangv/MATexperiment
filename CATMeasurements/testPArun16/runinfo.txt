@@ -1,0 +1,1 @@
+PA test run 16: zooming in -1.5 cm-1 to -2.0 cm-1, 1.85 pampl, -12 Mhz detuning

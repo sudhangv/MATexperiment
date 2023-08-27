@@ -29,20 +29,21 @@ FREQVSCURR = 1.13
 
 # TODO: find a better place for this
 EXP_FOLDER =r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements'
-MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArun10')
-WDATA_FOLDER =os.path.join(MEASURE_FOLDER, 'testPArun10.csv')
+MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArun16')
+WDATA_FOLDER =os.path.join(MEASURE_FOLDER, 'testPArun16.csv')
 
 # TODO: maybe make a run analysis class out of this?
 def dump():
-	plot_results(df, max_freq= 384219., fmt='o', mfc='red', save_folder=MEASURE_FOLDER)
+	fig, ax = plt.subplots()
+	plot_results(ax, df, max_freq= 384219., fmt='o', mfc='red', save_folder=MEASURE_FOLDER)
 	plt.savefig(os.path.join(MEASURE_FOLDER, 'ratio_vs_freq.png'))
 
 	
 	collect_plots(MEASURE_FOLDER, os.path.join(MEASURE_FOLDER, 'collected_plots'), 'deloadPhase.png')
  
-	#-----------------------
-	# SINGLE RUN
- 	#----------------------- 
+	#*-----------------------
+	#* SINGLE RUN
+ 	#*----------------------- 
   
 	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArun9')
 	df = get_data_frame(MEASURE_FOLDER)
@@ -60,9 +61,9 @@ def dump():
 				 mfc='red', color='black', 
 				 title='Trap Depth = 1.99 K')
  
-	#-----------------------
-	# MULTIPLE RUN COMPARISON
- 	#-----------------------
+	# *-----------------------
+	# * MULTIPLE RUN COMPARISON
+ 	# *-----------------------
 	folders = [os.path.join(EXP_FOLDER, path ) for path in ['testPARun11', 'testPARun12', 'testPARun13', 'testPARun14']]
 	dfs = [get_data_frame(measure_folder, cache_all=True) for measure_folder in folders]
 
@@ -78,10 +79,9 @@ def dump():
 		color = colors[i]
 		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], scolor=color, mfc=color,color=color, s=0.02, ms=5)
 
-	#-----------------------
-	# PARSING WAVEMETER DATA
- 	#-----------------------
-	FREQVSVOLT = 225.0
+	#*-----------------------
+	#* PARSING WAVEMETER DATA
+ 	#*-----------------------
 
 	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArun14')
 	WDATA_FOLDER =os.path.join(MEASURE_FOLDER, 'testPArun14.csv')
@@ -94,35 +94,6 @@ def dump():
 	freqs = ((max_freq)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
 	plt.plot(freqs)
  
-	# -----------------------
-	# RELATIVE SCATTERING RATE
-	# -----------------------
-
-def get_rel_scattering(run_path):
-	run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\relScatRate\22-09-38"
-	filename = os.path.join(run_path, 'data.csv')
-	bkfilename = os.path.join(run_path, 'data_oldPD.csv')
-	settingsname = os.path.join(run_path, 'Settings.txt')
-
-	dh1 = MTdataHost(SAMPLE_RATE)
-	dh1.loadCATdata(fileName=filename, settingsName=settingsname)
-
-	dh1.tBaseline = 1
-	dh1.tLoad = 2
-	dh1.timeLoad = 60
-	dh1.tReload = dh1.tLoad + dh1.timeLoad
-	dh1.timeReload = 1
-	dh1.tCATbackground = dh1.tReload + dh1.timeReload
-	#dh1.CATbackgroundData(bkfilename)
-	dh1.setAllCAT(0.002)
-
-	print(dh1.motSS/(dh1.reloadVolt+dh1.baseVolt - (dh1.CATbackgroundVolt+dh1.noLightBackground)))
-	plt.scatter(dh1.time, dh1.voltage, s=0.1)
-	plt.plot(dh1.reloadTime,dh1.reloadFitVoltage, c='orange')
-	plt.plot(dh1.loadingTime,dh1.motFit, c='red')
-	plt.plot(dh1.baseTime,dh1.baseVoltage, c='yellow')
-	plt.plot(dh1.CATbackgroundTime,dh1.CATbackgroundVoltage, c='pink')
-
 def freq_misc():
 	WDATA_FOLDER = r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\CATcurrTestrun3.csv'
 	freq_data = add_wavemeter_data('', WDATA_FOLDER)
@@ -259,8 +230,8 @@ def get_data_frame(data_dir, parallel=True, in_process_run=False, **kwargs):
 
 def add_wavemeter_data(df, wmeter_csv_path, window_size=100, num_rows=50):
 
-	"""Extract unique frequnecy values from wavemeter data
 
+	"""Extract unique frequnecy values from wavemeter data
 	Returns:
 		unique_levels (list): unique frequency values in wavemeter data
 	"""
@@ -282,7 +253,7 @@ def add_wavemeter_data(df, wmeter_csv_path, window_size=100, num_rows=50):
 
 def plot_results(ax, dfs, max_freq, min_freq=0.0, mfc='red', fmt='o', ms=5, save_folder=False, xscale=1.0, yscale=1.0, **kwargs):
 	FREQVSVOLT = 221.0 
-	FREQVSCURR = 1.14
+	FREQVSCURR = 1.13
 	
 	if not type(dfs) == list:
 		freqs = ((max_freq-PUMP_FREQUENCY)-(dfs.dropna()['tempV']-dfs.dropna()['tempV'].min())*FREQVSVOLT- (dfs.dropna()['currV']-dfs.dropna()['currV'].min())*FREQVSCURR)*xscale
@@ -311,8 +282,11 @@ def plot_spline_fit(ax, x, y, s=1, yerr=None, scolor='black',figsize=(12,5), sav
 	from scipy.interpolate import splev, splrep
 	xnew = np.linspace(min(x), max(x), 3*len(x) )
 
-	x = sorted(x)
 	y = [b for a,b in sorted(zip(x,y), key=lambda pair: pair[0])]
+	yerr = [b for a,b in sorted(zip(x,yerr), key=lambda pair: pair[0])]
+ 
+	x = sorted(x)
+
 	spl = splrep(x, y, s=s)
 	ynew = splev(xnew, spl)
 
@@ -425,9 +399,62 @@ def load_single_run(run_path):
 	dh1.loadCATdata(fileName=filename, settingsName=settingsname)
 	
 	return dh1
+	# *-----------------------
+	# *RELATIVE SCATTERING RATE
+	# *-----------------------
+
+def get_rel_scattering(run_path1, run_path2):
+	dh1, scat_ratio1 = _load_single_run_rel_scat(run_path1)
+	dh2, scat_ratio2 = _load_single_run_rel_scat(run_path2)
+	
+	print(f"scat_ratio 1,2 = {scat_ratio1, 1/scat_ratio2}")
+	scat_ratio_avg = (scat_ratio1+1/scat_ratio2)/2
+	
+	Rratio = dh1.initMOTR/dh2.initMOTR
+	print(fr"Rratio = {dh1.initMOTR} / {dh2.initMOTR} = {Rratio}")
+	depthRatio = np.sqrt(Rratio/scat_ratio_avg)
+	
+	return depthRatio
+
+def _load_single_run_rel_scat(run_path):
+	filename = os.path.join(run_path, 'data.csv')
+	bkfilename = os.path.join(run_path, 'data_oldPD.csv')
+	settingsname = os.path.join(run_path, 'Settings.txt')
+	
+	dh1 = MTdataHost(SAMPLE_RATE)
+	dh1.loadCATdata(fileName=filename, settingsName=settingsname)
+
+	dh1.tBaseline = 1
+	dh1.tLoad = 2
+	dh1.timeLoad = 30
+	dh1.tReload = dh1.tLoad + dh1.timeLoad
+	dh1.timeReload = 1
+	dh1.tCATbackground = dh1.tReload + dh1.timeReload
+	#dh1.CATbackgroundData(bkfilename)
+	dh1.setAllCAT(0.002)
+ 
+	plt.close()
+	plt.scatter(dh1.time, dh1.voltage, s=0.1)
+	plt.plot(dh1.reloadTime,dh1.reloadFitVoltage, c='orange')
+	plt.plot(dh1.loadingTime,dh1.motFit, c='red')
+	plt.plot(dh1.baseTime,dh1.baseVoltage, c='yellow')
+	plt.plot(dh1.CATbackgroundTime,dh1.CATbackgroundVoltage, c='pink')
+	plt.show()
+ 
+	ind1 = int(dh1.initTime[0]*2000)
+	ind2 = ind1 + len(dh1.initTime)
+	
+	plt.close()
+	plt.plot(dh1.initTime, dh1.voltage[ind1:ind2+1][:len(dh1.initTime)])
+	plt.plot(dh1.initTime, dh1.initFit[2])
+	plt.show()
+ 
+	scat_ratio = dh1.motSS/(dh1.reloadVolt+dh1.baseVolt - (dh1.CATbackgroundVolt+dh1.noLightBackground))
+	
+	return dh1, scat_ratio
 
 def scat_rate(gamma, I, Is, delta):
-    return gamma*I/(2*Is*(1+I/Is+4*(delta/gamma)**2))
+	return gamma*I/(2*Is*(1+I/Is+4*(delta/gamma)**2))
 if __name__ == '__main__':
 	run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testPArun9\16-53-10"
 	filename = os.path.join(run_path, 'data.csv')
