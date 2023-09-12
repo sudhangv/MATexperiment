@@ -1,1 +1,0 @@
-PA test run 14: run between -1.5cm-1 and -2.0 cm-1 (6.7 ish mW/cm^2, -10 MHz) 

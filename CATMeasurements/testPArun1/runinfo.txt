@@ -1,1 +1,0 @@
-PA test run: TA current at 1050mA, pump intensity is around 7mw/cm^2, detuning = -12MHz. Starting freq = 384219.1 GHz 

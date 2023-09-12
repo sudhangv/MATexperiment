@@ -1,0 +1,1 @@
+PA test run 20: zooming in  ~-47Ghz  to -52Ghz  (1.2 pampl, -12 MHz) 

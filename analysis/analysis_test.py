@@ -47,9 +47,6 @@ def dump():
   
 	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArun9')
 	df = get_data_frame(MEASURE_FOLDER)
-	# df.drop(['CATbkBool',
-	# 	'CATnoLightBackground', 'CATbkAvg', 'CATprop', 'reloadStartInd',
-	# 	'reloadEndInd'], axis=1,inplace=True)
 	df.dropna(inplace=True)
 	#freqs = plot_results(df, 384201., save_folder=MEASURE_FOLDER)
  
@@ -94,6 +91,75 @@ def dump():
 	freqs = ((max_freq)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
 	plt.plot(freqs)
  
+	#*-----------------------
+	#* GETTING DEPTH_RATIO DATAFRAME
+ 	#*-----------------------
+	MEASURE_FOLDER = r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\relScatRate'
+	depth_ratios_df = get_rel_scattering_df(MEASURE_FOLDER)
+	df_slice = depth_ratios_df[(depth_ratios_df['pa1']==1.85) & (depth_ratios_df['pd1']==84) & (depth_ratios_df['pd2'] == 84)]
+	x = df_slice['pa2']
+	y = df_slice['depth_ratio']
+	plt.plot(x,y, 'o')
+
+	#*-----------------------
+	#* MEGA_RUN
+ 	#*-----------------------	
+	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPARunMega')
+	df = get_data_frame(MEASURE_FOLDER)
+	df.dropna(inplace=True)
+
+	df_grouped = df.groupby(by='pump_reference')
+	min_ratios = df_grouped['ratio'].min()
+
+	groups = dict(list(df_grouped))
+	dfs = [df for df in groups.values()]
+ 
+	max_freqs = [384182.5]*15
+	#max_freqs=[384178.599, 384179.091, 384184.733]
+	zipped_data = list(zip(dfs, max_freqs))
+	fig, ax = plt.subplots()
+	for i, (df, max_freq)  in enumerate(zipped_data[:]):
+		data = df.dropna()
+		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.0, ms=5, figsize=(10, 10), label=f"Pump Amplituide = { df.iloc[10]['pump_reference'] :.2f}", linewidth=2.5)
+
+	plt.legend()
+
+	plt.savefig(os.path.join(MEASURE_FOLDER, 'lossFeatures.png'))
+ 
+	x = [(180-2*df['pump_AOM_freq'].mean()) for df in dfs]
+	y = [(df['ratio'].max() - df['ratio'].min()) for df in dfs]
+	plt.plot( x, y ,'-o', label=fr"$\delta$ = {180 - 2*dfs[0]['pump_AOM_freq'].mean()} MHz")
+	plt.xlabel(r'$\delta$ (MHz)')
+	plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
+ 
+	x = [df['pump_reference'].mean() for df in dfs]
+	y = [(df['ratio'].max() - df['ratio'].min()) for df in dfs]
+	plt.plot( x, y ,'-o', label=f"Pump Amplitude = {df['pump_reference'].mean()}")
+	plt.xlabel('Pump Amplitude')
+	plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
+	plt.title(fr"$\delta $ ={180-2*df['pump_AOM_freq'].mean()}")
+	#*-----------------------
+	#* MULTIPLE MEGARUN
+	#*-----------------------
+ 
+	folders = [os.path.join(EXP_FOLDER, path ) for path in ['testPArunMega', 'testPArunMega2']]
+	dfs_mega = [get_data_frame(measure_folder, cache_all=True).dropna() for measure_folder in folders]
+
+	dfs_grouped = [df_mega.groupby(by='pump_reference') for df_mega in dfs_mega]
+	min_ratios = [df_grouped['ratio'].min() for df_grouped in dfs_grouped]
+
+	groupss = [dict(list(df_grouped)) for df_grouped in dfs_grouped]
+	dfs = [ [df for df in groups.values()] for groups in groupss]
+ 
+	for row in dfs:
+		x = [df['pump_reference'].mean() for df in row]
+		y = [(df['ratio'].max() - df['ratio'].min())/df['motSS'].std() for df in row]
+		plt.plot( x, y ,'-o', label=fr"$\delta$ = {180 - 2*row[0]['pump_AOM_freq'].mean()} MHz")
+		plt.xlabel('Pump Amplitude')
+		plt.ylabel(r'SNR $ = \frac{V_{ss, off} - V_{ss, on}}{\sigma_{V,off}}$ ')
+	plt.legend()
+
 def freq_misc():
 	WDATA_FOLDER = r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\CATcurrTestrun3.csv'
 	freq_data = add_wavemeter_data('', WDATA_FOLDER)
@@ -176,7 +242,7 @@ def extract_fit(run_path, plot=True, cache_failed=True, cache_all=True):
 			if not cache_failed:
 				# fit regardless of cached result
 				try: 
-					fit_results = save_fit_results(run_path, plot=plot)
+					fit_results, settings = save_fit_results(run_path, plot=plot)
 				except Exception as e:
 					print(traceback.format_exc())
 					print("Fitting ERROR at ", os.path.basename(run_path), '\n')
@@ -278,12 +344,13 @@ def plot_results(ax, dfs, max_freq, min_freq=0.0, mfc='red', fmt='o', ms=5, save
 	#return plt.gca(), plt.gcf()
 	#plt.show()
 
-def plot_spline_fit(ax, x, y, s=1, yerr=None, scolor='black',figsize=(12,5), save_folder=None, title='',alpha=0.5,dpi=200,**kwargs):
+def plot_spline_fit(ax, x, y, s=1, yerr=None, color='black', scolor='black',figsize=(12,5), save_folder=None, title='',alpha=0.5,dpi=200, label='plot',**kwargs):
 	from scipy.interpolate import splev, splrep
 	xnew = np.linspace(min(x), max(x), 3*len(x) )
 
 	y = [b for a,b in sorted(zip(x,y), key=lambda pair: pair[0])]
-	yerr = [b for a,b in sorted(zip(x,yerr), key=lambda pair: pair[0])]
+	if yerr is not None:
+		yerr = [b for a,b in sorted(zip(x,yerr), key=lambda pair: pair[0])]
  
 	x = sorted(x)
 
@@ -298,9 +365,9 @@ def plot_spline_fit(ax, x, y, s=1, yerr=None, scolor='black',figsize=(12,5), sav
 		ax.errorbar(x, y, yerr=yerr, fmt='o', **kwargs)
 	else:
 		ax.plot(x,y, 'o', **kwargs)
-	ax.plot(xnew, ynew, '-', color=scolor, alpha=alpha)
+	ax.plot(xnew, ynew, '-', color=scolor, alpha=alpha, label=label, **kwargs)
  
-	ax.set_ylabel(r'$\mathbf{\frac{V_{ss, cat}}{V_{ss}}} $ ', labeldict)
+	ax.set_ylabel(r'$\mathbf{\frac{V_{ss, cat}}{V_{ss}}} $ ', **labeldict)
 	ax.set_xlabel(r'$\Delta $ (GHz)', **labeldict)
  
 	ax.set_title(title, **titledict)
@@ -399,97 +466,21 @@ def load_single_run(run_path):
 	dh1.loadCATdata(fileName=filename, settingsName=settingsname)
 	
 	return dh1
-	# *-----------------------
-	# *RELATIVE SCATTERING RATE
-	# *-----------------------
+	
 
-def get_rel_scattering(run_path1, run_path2):
-	dh1, scat_ratio1 = _load_single_run_rel_scat(run_path1)
-	dh2, scat_ratio2 = _load_single_run_rel_scat(run_path2)
-	
-	print(f"scat_ratio 1,2 = {scat_ratio1, 1/scat_ratio2}")
-	scat_ratio_avg = (scat_ratio1+1/scat_ratio2)/2
-	
-	Rratio = dh1.initMOTR/dh2.initMOTR
-	print(fr"Rratio = {dh1.initMOTR} / {dh2.initMOTR} = {Rratio}")
-	depthRatio = np.sqrt(Rratio/scat_ratio_avg)
-	
-	return depthRatio
 
-def _load_single_run_rel_scat(run_path):
-	filename = os.path.join(run_path, 'data.csv')
-	bkfilename = os.path.join(run_path, 'data_oldPD.csv')
-	settingsname = os.path.join(run_path, 'Settings.txt')
-	
-	dh1 = MTdataHost(SAMPLE_RATE)
-	dh1.loadCATdata(fileName=filename, settingsName=settingsname)
 
-	dh1.tBaseline = 1
-	dh1.tLoad = 2
-	dh1.timeLoad = 30
-	dh1.tReload = dh1.tLoad + dh1.timeLoad
-	dh1.timeReload = 1
-	dh1.tCATbackground = dh1.tReload + dh1.timeReload
-	#dh1.CATbackgroundData(bkfilename)
-	dh1.setAllCAT(0.002)
- 
-	plt.close()
-	plt.scatter(dh1.time, dh1.voltage, s=0.1)
-	plt.plot(dh1.reloadTime,dh1.reloadFitVoltage, c='orange')
-	plt.plot(dh1.loadingTime,dh1.motFit, c='red')
-	plt.plot(dh1.baseTime,dh1.baseVoltage, c='yellow')
-	plt.plot(dh1.CATbackgroundTime,dh1.CATbackgroundVoltage, c='pink')
-	plt.show()
- 
-	ind1 = int(dh1.initTime[0]*2000)
-	ind2 = ind1 + len(dh1.initTime)
-	
-	plt.close()
-	plt.plot(dh1.initTime, dh1.voltage[ind1:ind2+1][:len(dh1.initTime)])
-	plt.plot(dh1.initTime, dh1.initFit[2])
-	plt.show()
- 
-	scat_ratio = dh1.motSS/(dh1.reloadVolt+dh1.baseVolt - (dh1.CATbackgroundVolt+dh1.noLightBackground))
-	
-	return dh1, scat_ratio
-
-def scat_rate(gamma, I, Is, delta):
-	return gamma*I/(2*Is*(1+I/Is+4*(delta/gamma)**2))
 if __name__ == '__main__':
-	run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testPArun9\16-53-10"
-	filename = os.path.join(run_path, 'data.csv')
-	bkfilename = os.path.join(run_path, 'data_oldPD.csv')
-	settingsname = os.path.join(run_path, 'Settings.txt')
+	# run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testPArun9\16-53-10"
+	# filename = os.path.join(run_path, 'data.csv')
+	# bkfilename = os.path.join(run_path, 'data_oldPD.csv')
+	# settingsname = os.path.join(run_path, 'Settings.txt')
 	
-	dh1 = MTdataHost(SAMPLE_RATE)
-	dh1.loadCATdata(fileName=filename, settingsName=settingsname)
+	# dh1 = MTdataHost(SAMPLE_RATE)
+	# dh1.loadCATdata(fileName=filename, settingsName=settingsname)
 	
- 	#dh1.CATbackgroundData(bkfilename)
-	dh1.setAllCAT(0.002)
-	
- 	# ---------------------
-	# Look at Loading rate
-	# ---------------------
+	# dh1.setAllCAT(0.002)
  
-	# run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testPArun9\16-38-18"
-	# filename = os.path.join(run_path, 'data.csv')
-	# bkfilename = os.path.join(run_path, 'data_oldPD.csv')
-	# settingsname = os.path.join(run_path, 'Settings.txt')
-
-	# dataHost1 = MTdataHost(SAMPLE_RATE)
-	# dataHost1.loadCATdata(fileName=filename, settingsName=settingsname)
-
-	# #dataHost.CATbackgroundData(bkfilename)
-	# dataHost1.setAllCAT(0.002)
-
-	# run_path = r"C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\testPArun10\21-05-29"
-	# filename = os.path.join(run_path, 'data.csv')
-	# bkfilename = os.path.join(run_path, 'data_oldPD.csv')
-	# settingsname = os.path.join(run_path, 'Settings.txt')
-
-	# dataHost2 = MTdataHost(SAMPLE_RATE)
-	# dataHost2.loadCATdata(fileName=filename, settingsName=settingsname)
-
-	# #dataHost.CATbackgroundData(bkfilename)
-	# dataHost2.setAllCAT(0.002)
-
+ 	#dh1.CATbackgroundData(bkfilename)
+	
+	pass

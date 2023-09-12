@@ -211,25 +211,35 @@ class MTdataHost:
 		# search within the first 0.5 seconds
 		endInd = self.getTimeInd(15)
 
-		testInd = self.getTimeInd(0.005)
+  		#testInd = self.getTimeInd(0.005)
+		testInd = self.getTimeInd(0.0010)
 
 		# find value of voltage at beginning of data
 		compar = np.average(self.voltage[:testInd])
+		std = np.std(self.voltage[:testInd])
 		self.noLightBackground = compar
 		#print(f"\n \n Compar = {compar} \n \n") 
 		# find where voltage is greater than any typical background value
 		if compar < 0:
 			offsetPts = np.where((self.voltage[testInd:endInd] - compar) > abs(2*compar))
 		else:
-			offsetPts = np.where(self.voltage[testInd:endInd] > 2*compar)
-
+			#offsetPts = np.where(self.voltage[testInd:endInd] > 2*compar)
+   			#offsetPts = np.where((self.voltage[testInd:endInd] - compar) > 4*std)
+			offsetPt = np.argmax(np.abs(np.diff(self.voltage[testInd : testInd+int(1.1*self.sampleRate)])))
 		# try to set offset
 		try:
-			self.offset = self.time[offsetPts[0][0]]
+			#self.offset = self.time[offsetPts[0][0]]
+			self.offset  = self.time[offsetPt]
+			if self.offset > 1.1 or self.offset<0.9:
+				self.offset=1.01
+			# 	offsetInd = np.argmax(np.abs(np.diff(self.voltage[testInd : testInd+int(1.1*self.sampleRate)])))
+			# 	self.offset = offsetInd/self.sampleRate
 		# raise error if not found
 		except IndexError:
 			raise UserWarning('Offset not found.')
-		
+		except Exception as e:
+			#raise UserWarning(f'Other error {e}')
+			pass
 
 	def getAverage(self, data):
 		values = np.average(data)
@@ -615,7 +625,7 @@ class MTdataHost:
 		
 		linear_fit = False
 		tStart = self.setDeloadEnd(timeBuffer)
-		timeDiff = 20*timeBuffer
+		timeDiff = 75*timeBuffer
 		
 		tEnd = tStart + self.timeReload - 20*timeBuffer
 		#tEnd = self.setMTExEnd(tStart + 10*timeBuffer, tStart + self.timeTest + 10*timeBuffer)- 10*timeBuffer # added this to reduce range of fit, 80 for fast, 10 for slow
@@ -795,6 +805,7 @@ class MTdataHost:
 			plt.plot(self.loadingTime,self.motFit, c='red')
 			plt.plot(self.baseTime,self.baseVoltage, c='yellow')
 			plt.plot(self.CATbackgroundTime,self.CATbackgroundVoltage, c='pink')
+			plt.plot(self.initTime, self.initFit[2], color='grey')
 			
 			plt.savefig(os.path.join(dirName,'fits.png'), dpi=400)
 			plt.close()
