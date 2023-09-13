@@ -13,6 +13,7 @@ import scipy.constants as spc
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 plt.rcParams['axes.grid'] = True
 plt.rcParams['grid.linestyle'] = '--'
@@ -159,6 +160,80 @@ def dump():
 		plt.xlabel('Pump Amplitude')
 		plt.ylabel(r'SNR $ = \frac{V_{ss, off} - V_{ss, on}}{\sigma_{V,off}}$ ')
 	plt.legend()
+ 
+	#*-----------------------
+	#* FULL RUNS
+	#*-----------------------
+	
+	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArunFull4')
+	df = get_data_frame(MEASURE_FOLDER)
+	df.dropna(inplace=True)
+
+	dfc = df.copy()
+	df_grouped = df.groupby(by=['pump_reference', 'pump_AOM_freq'])
+	groups = dict(list(df_grouped))
+	dfs = [df for df in groups.values()]
+ 
+	max_freqs = [384182.8]*30
+	zipped_data = list(zip(dfs, max_freqs))
+	fig, ax = plt.subplots(5)
+	for i, (df, max_freq)  in enumerate(zipped_data[:]):
+		j = i//4
+		data = df.dropna()
+		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-0.0)*FREQVSCURR)
+		
+		ax[j] = plot_spline_fit(ax[j], x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i%4}', mfc=f'C{i%4}',color=f'C{i%4}', s=0.0, ms=5, figsize=(5, 25), linewidth=1.5, label=f"Detuning  = { 180-2*df.iloc[10]['pump_AOM_freq'] :.2f}")
+		
+		ax[j].set_title(f"Pump Amplituide = { df.iloc[10]['pump_reference'] :.2f}", **titledict)
+
+		ax[j].legend()
+
+	plt.tight_layout()
+	plt.show()
+	plt.savefig(os.path.join(MEASURE_FOLDER, 'lossFeatures.png'))
+	plt.close()
+
+	SNRdata = df_grouped['ratio'].max() - df_grouped['ratio'].min()
+	SNRdf = SNRdata.reset_index()
+	SNRdf.columns = ['pump_reference', 'pump_AOM_freq', 'SNR']
+	pivot_table = SNRdf.pivot('pump_reference', 'pump_AOM_freq', 'SNR')
+	xticklabels = [f'{x:.2f}' for x in pivot_table.columns]
+	yticklabels = [f'{y:.2f}' for y in pivot_table.index]
+	sns.heatmap(pivot_table, annot=True, fmt='.2f', xticklabels=xticklabels, yticklabels=yticklabels)
+	plt.grid()
+	plt.savefig(os.path.join(MEASURE_FOLDER, f'heatmap.png'))
+	# fig, ax = plt.subplots()
+	# for i, (df, max_freq)  in enumerate(zipped_data[:]):
+	# 	data = df.dropna()
+	# 	freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+		
+	# 	ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.0, ms=5, figsize=(10, 10), linewidth=2.5)
+		
+	# 	plt.title(f"Pump Amplituide = { df.iloc[10]['pump_reference'] :.2f}, \
+	# 				sDetuning  = { 180-2*df.iloc[10]['pump_AOM_freq'] :.2f}", **titledict)
+
+	# 	plt.legend()
+
+	# 	plt.savefig(os.path.join(MEASURE_FOLDER, f'lossFeatures{i}.png'))
+	# 	plt.show()
+		
+	# 	plt.close()
+	# 	fig, ax = plt.subplots()
+  
+	SNRdata = df_grouped['ratio'].max() - df_grouped['ratio'].min()
+	SNRdf = SNRdata.reset_index()
+	SNRdf.columns = ['pump_reference', 'pump_AOM_freq', 'SNR']
+	pivot_table = SNRdf.pivot('pump_reference', 'pump_AOM_freq', 'SNR')
+	xticklabels = [f'{180-2*x:.2f}' for x in pivot_table.columns]
+	yticklabels = [f'{y:.2f}' for y in pivot_table.index]
+	sns.heatmap(pivot_table, annot=True, fmt='.2f', xticklabels=xticklabels, yticklabels=yticklabels)
+	plt.xlabel("Detuning (MHz)")
+	plt.ylabel("Pump Reference")
+	plt.grid()
+	plt.savefig(os.path.join(MEASURE_FOLDER, 'heatmap.png'))
+	plt.close()
+
+
 
 def freq_misc():
 	WDATA_FOLDER = r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\CATcurrTestrun3.csv'
