@@ -1,1 +1,0 @@
-Run at higher CAT current (1050 mA) at lower repump power (to 0.5) and lower pump power (0.9-> 6.7ish mW/cm2) and lower detuning to -10

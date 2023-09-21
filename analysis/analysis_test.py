@@ -1,4 +1,5 @@
 import os
+from os.path import join 
 import sys
 from functools import partial
 sys.path.append(os.path.join(os.getcwd(), '..')) #adds directory below as valid path
@@ -62,20 +63,17 @@ def dump():
 	# *-----------------------
 	# * MULTIPLE RUN COMPARISON
  	# *-----------------------
-	folders = [os.path.join(EXP_FOLDER, path ) for path in ['testPARun11', 'testPARun12', 'testPARun13', 'testPARun14']]
-	dfs = [get_data_frame(measure_folder, cache_all=True) for measure_folder in folders]
+	folders = [os.path.join(EXP_FOLDER, path ) for path in ['PArunHalfVarDet1', 'testPAVaryingCATampl']]
+	dfs = [get_data_frame(measure_folder) for measure_folder in folders]
 
-	colors = ['red', 'dodgerblue', 'green', 'grey']
-	max_freqs = [384178.881, 384178.593,384179.068, 384184.731]
-	#max_freqs=[384178.599, 384179.091, 384184.733]
+	dfs = [get_data_frame(measure_folder) for measure_folder in folders]
 
-	zipped_data = list(zip(dfs, max_freqs))
-	fig, ax = plt.subplots()
-	for i, (df, max_freq)  in enumerate(zipped_data[:3]):
+	max_freqs = [384182.6]*len(dfs)
+	for i, (df, max_freq)  in enumerate(zipped_data[:]):
+		fig, ax = plt.subplots()
 		data = df.dropna()
 		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
-		color = colors[i]
-		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], scolor=color, mfc=color,color=color, s=0.02, ms=5)
+		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'], scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.00, ms=5, save_folder=join(folders[i]))
 
 	#*-----------------------
 	#* PARSING WAVEMETER DATA
@@ -176,32 +174,47 @@ def dump():
  
 	max_freqs = [384182.8]*30
 	zipped_data = list(zip(dfs, max_freqs))
-	fig, ax = plt.subplots(5)
+	fig1, ax1s = plt.subplots(4)
+	fig2, ax2s = plt.subplots(5)
 	for i, (df, max_freq)  in enumerate(zipped_data[:]):
-		j = i//4
+		j1 = i%4
+		j2 = i//4
+		
 		data = df.dropna()
 		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-0.0)*FREQVSCURR)
+		ax2s[j2] = plot_spline_fit(ax2s[j2], x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i%4}', mfc=f'C{i%4}',color=f'C{i%4}', s=0.0, ms=5, figsize=(5, 25), linewidth=1.5, label=f"Detuning  = { 180-2*df.iloc[10]['pump_AOM_freq'] :.2f}", fig=fig2)
+		ax2s[j2].set_title(f"Pump Amplituide = { df.iloc[10]['pump_reference'] :.2f}", **titledict)
+		ax2s[j2].legend()
 		
-		ax[j] = plot_spline_fit(ax[j], x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i%4}', mfc=f'C{i%4}',color=f'C{i%4}', s=0.0, ms=5, figsize=(5, 25), linewidth=1.5, label=f"Detuning  = { 180-2*df.iloc[10]['pump_AOM_freq'] :.2f}")
+		ax1s[j1] = plot_spline_fit(ax1s[j1], x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i//4}', mfc=f'C{i//4}',color=f'C{i//4}', s=0.0, ms=5, figsize=(5, 25), linewidth=1.5, label=f"Pump Amplitude = { df.iloc[10]['pump_reference'] :.2f}", fig=fig1)
+		ax1s[j1].set_title(f"Detuning  = { 180-2*df.iloc[10]['pump_AOM_freq'] :.2f}", **titledict)
+		ax1s[j1].legend()
 		
-		ax[j].set_title(f"Pump Amplituide = { df.iloc[10]['pump_reference'] :.2f}", **titledict)
+	fig1.tight_layout()
+	fig2.tight_layout()
 
-		ax[j].legend()
-
-	plt.tight_layout()
+	fig1.savefig(os.path.join(MEASURE_FOLDER, 'lossFeaturesDet.png'))
 	plt.show()
-	plt.savefig(os.path.join(MEASURE_FOLDER, 'lossFeatures.png'))
 	plt.close()
 
+	fig2.savefig(os.path.join(MEASURE_FOLDER, 'lossFeaturesPA.png'))
+	plt.show()
+	plt.close()
+	
 	SNRdata = df_grouped['ratio'].max() - df_grouped['ratio'].min()
 	SNRdf = SNRdata.reset_index()
 	SNRdf.columns = ['pump_reference', 'pump_AOM_freq', 'SNR']
 	pivot_table = SNRdf.pivot('pump_reference', 'pump_AOM_freq', 'SNR')
-	xticklabels = [f'{x:.2f}' for x in pivot_table.columns]
+	xticklabels = [f'{180-2*x:.2f}' for x in pivot_table.columns]
 	yticklabels = [f'{y:.2f}' for y in pivot_table.index]
 	sns.heatmap(pivot_table, annot=True, fmt='.2f', xticklabels=xticklabels, yticklabels=yticklabels)
+	plt.xlabel("Detuning (MHz)")
+	plt.ylabel("Pump Reference")
 	plt.grid()
-	plt.savefig(os.path.join(MEASURE_FOLDER, f'heatmap.png'))
+	plt.savefig(os.path.join(MEASURE_FOLDER, 'heatmap.png'))
+	plt.show()
+	plt.close()
+
 	# fig, ax = plt.subplots()
 	# for i, (df, max_freq)  in enumerate(zipped_data[:]):
 	# 	data = df.dropna()
@@ -219,19 +232,6 @@ def dump():
 		
 	# 	plt.close()
 	# 	fig, ax = plt.subplots()
-  
-	SNRdata = df_grouped['ratio'].max() - df_grouped['ratio'].min()
-	SNRdf = SNRdata.reset_index()
-	SNRdf.columns = ['pump_reference', 'pump_AOM_freq', 'SNR']
-	pivot_table = SNRdf.pivot('pump_reference', 'pump_AOM_freq', 'SNR')
-	xticklabels = [f'{180-2*x:.2f}' for x in pivot_table.columns]
-	yticklabels = [f'{y:.2f}' for y in pivot_table.index]
-	sns.heatmap(pivot_table, annot=True, fmt='.2f', xticklabels=xticklabels, yticklabels=yticklabels)
-	plt.xlabel("Detuning (MHz)")
-	plt.ylabel("Pump Reference")
-	plt.grid()
-	plt.savefig(os.path.join(MEASURE_FOLDER, 'heatmap.png'))
-	plt.close()
 
 
 
@@ -419,7 +419,7 @@ def plot_results(ax, dfs, max_freq, min_freq=0.0, mfc='red', fmt='o', ms=5, save
 	#return plt.gca(), plt.gcf()
 	#plt.show()
 
-def plot_spline_fit(ax, x, y, s=1, yerr=None, color='black', scolor='black',figsize=(12,5), save_folder=None, title='',alpha=0.5,dpi=200, label='plot',**kwargs):
+def plot_spline_fit(ax, x, y, s=1, yerr=None, color='black', scolor='black',figsize=(12,5), save_folder=None, title='',alpha=0.5,dpi=200, label='plot', fig=None,**kwargs):
 	from scipy.interpolate import splev, splrep
 	xnew = np.linspace(min(x), max(x), 3*len(x) )
 
@@ -429,13 +429,16 @@ def plot_spline_fit(ax, x, y, s=1, yerr=None, color='black', scolor='black',figs
  
 	x = sorted(x)
 
+
 	spl = splrep(x, y, s=s)
 	ynew = splev(xnew, spl)
 
-	
-	plt.gcf().set_dpi(dpi)
-	plt.gcf().set_size_inches(figsize)
-	
+	if fig is None:
+		plt.gcf().set_dpi(dpi)
+		plt.gcf().set_size_inches(figsize)
+	else:
+		fig.set_dpi(dpi)
+		fig.set_size_inches(figsize)
 	if yerr is not None:
 		ax.errorbar(x, y, yerr=yerr, fmt='o', **kwargs)
 	else:

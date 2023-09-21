@@ -1,0 +1,1 @@
+Run at fixed pump-intensity with different detuning after _new_ MOT. Starting freq: 384182.6 . DATE = 20Sep2023

@@ -1,1 +1,0 @@
-CATLoadMegaRun3 with varying CAT beam powers 0.1 AND 1.0 MOT settings : 86 Mhz, 1.85 pAmpl, 60s load time 

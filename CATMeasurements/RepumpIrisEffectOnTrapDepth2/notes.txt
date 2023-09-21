@@ -1,0 +1,11 @@
+1-12: decreasing repump beam size in sets of 4(so three sets in total)
+
+13-14: same repump size as 8-12, but with repump reference = 2.0
+
+15-16: same repump size as 8-12, but with repump reference = 0.5 
+
+17-19: smaller repump size,  with repump reference = 0.5 
+
+20-21: smallest repump size,  with repump reference = 0.5 
+
+22-23: smallest repump size,  with repump reference = 2.0 

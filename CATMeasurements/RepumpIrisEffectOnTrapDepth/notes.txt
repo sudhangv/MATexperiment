@@ -1,0 +1,5 @@
+1. fully open iris
+2. almost fully closed iris
+3. midway between 1 and 2
+4. fully closed (as much as possible) iris
+5. testing with repump reference =2.0

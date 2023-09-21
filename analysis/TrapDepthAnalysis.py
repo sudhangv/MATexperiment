@@ -42,6 +42,34 @@ def dump():
 	sns.heatmap(pivot_table, annot=True, fmt='.2f', cmap='magma')
 	plt.grid()
  
+	# heatmap for scattering
+	Is = np.linspace(3, 18, 5)
+	deltas = np.array([-6,-8,-10,-12,-14])
+
+	X,Y = np.meshgrid(Is, deltas)
+	plt.gcf().set_size_inches(10, 10)
+
+	sns.heatmap(scat_rate(X,Y),  annot=True, fmt='.2f', cmap='magma')
+	plt.xticks(range(len(Is)), [f'{I:.2f}' for I in Is])
+	plt.yticks(range(len(deltas)), [f'{delta:.2f}' for delta in deltas])
+
+	plt.xlabel('Intensity (mW/cn2)')
+	plt.ylabel('Detunings (MHz)')
+
+	plt.grid()
+
+	# 3-D contour plot	
+	fig = plt.figure()
+	ax = plt.axes(projection='3d')
+	ax.contour3D(X, Y, scat_rate(X,Y), 20,  cmap='binary')
+	ax.set_xlabel('I')
+	ax.set_ylabel('Delta')
+	ax.set_zlabel('z')
+	ax.set_title('3D contour')
+	plt.grid()
+	plt.show()
+
+ 
 def get_timestamp(run_path):
 	timestamp = datetime.strptime(os.path.split(run_path)[-1].split('_')[0], dateformat)
 	return timestamp
