@@ -1,0 +1,3 @@
+Run to test repump beam power dependence of loss feature.
+
+ Starting freq: 384182.55 . DATE = 21Sep2023

@@ -1,0 +1,1 @@
+HalfRun after _new_ MOT. Same as previous HalfRun, but now with lower pump_ref=1.0. Starting freq: 384182.7 . DATE = 21Sep2023

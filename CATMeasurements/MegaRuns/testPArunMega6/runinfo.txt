@@ -1,0 +1,2 @@
+*** (added info on Sep 8)
+Detuning = 87 Mhz, CAT AOM ampl is max

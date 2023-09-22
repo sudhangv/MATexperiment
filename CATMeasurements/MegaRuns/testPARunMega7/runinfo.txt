@@ -1,0 +1,1 @@
+Mega run with lower CAT beam ampl at 0.2. MOT settings same as before: 87 Mhz 

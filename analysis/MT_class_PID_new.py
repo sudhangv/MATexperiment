@@ -14,12 +14,17 @@ Created on Fri Jul 19 2019
 
 import numpy as np
 from numpy.testing._private.utils import assert_allclose
-from scipy.optimize import curve_fit, minimize
-from scipy.special import erf
 import math
+import os 
+
+from scipy.optimize import curve_fit, minimize
+from scipy.integrate import odeint
+from scipy.special import erf
+from lmfit import Model, create_params
+import matplotlib.pyplot as plt
 from scipy.integrate import quad
 import scipy.special as sc
-import os 
+
 
 class MTdataHost:
 	'''
@@ -414,7 +419,11 @@ class MTdataHost:
 		#endInd = end1 + np.argmax(abs(self.voltage[end1:end2]))-1
 		temp = self.voltage[end1-30:end1]
 		std = np.std(temp)
-		endInd = end1 + np.where(abs(np.diff(self.voltage[end1:end2]))>6*std)[0][0]-1
+		try:
+			endInd = end1 + np.where(abs(np.diff(self.voltage[end1:end2]))>4*std)[0][0]-1
+		except Exception as e:
+			print(e)
+			endInd = end1 + 20
 		
 		self.loadingVoltage = self.voltage[startInd:endInd]
 		self.loadingTime = self.time[startInd:endInd]
@@ -673,9 +682,9 @@ class MTdataHost:
 	def setDeloading(self, timeBuffer):
 		
 		# sets the start and end time based upon the timing of the previous sequences
-		tStart = self.tDeload + 15*timeBuffer
-
-		tEnd1 = tStart + self.timeDeload - 10*timeBuffer
+		tStart = self.tDeload + 30*timeBuffer
+		#TODO: use proper timings for ending time and start time
+		tEnd1 = tStart + self.timeDeload - 40*timeBuffer
 		tEnd2 = tStart + self.timeDeload + 10*timeBuffer
 
 		end1, end2 = self.getTimeInd(tEnd1), self.getTimeInd(tEnd2)
@@ -683,6 +692,7 @@ class MTdataHost:
 		startInd = self.getTimeInd(tStart)
 		endInd = end1 
 		
+		self.deloadStartInd, self.deloadEndInd = startInd, end1
 		self.deloadVoltage = self.voltage[startInd:endInd]
 		self.deloadTime = self.time[startInd:endInd]
 
@@ -693,27 +703,43 @@ class MTdataHost:
 			self.deloadVoltage = self.voltage[startInd:endInd] - self.CATbackgroundVolt - self.baseVolt
    
 	
-		# def deloadModel(t, gamma, betaf, R, N0):
-		# 	t1 = np.sqrt(4*R*betaf + gamma**2)
-		# 	t2 = gamma + 2*betaf*N0
-		# 	result = -gamma/(2*betaf) + t1*np.tanh(0.5*t*t1+np.arctanh(t2/t1))/(2*betaf)
-		# 	return result
+		def N2(t, R, Gamma, beta, N0):
+        
+			def Nprime2(N, t, R, Gamma, beta):
+				return R - Gamma*N - beta*N**2
 
-		# # # TODO from here onwards
-		# popt,pcov = curve_fit(deloadModel,
-		# 			self.deloadTime - self.deloadTime[0], 
-		# 			self.deloadVoltage, 
-		# 			sigma = [self.std]*len(self.deloadVoltage), 
-		# 			absolute_sigma=True, 
-		# 			maxfev = 10**5,
-		# 			p0 = [self.motR, 0.01, self.motSS*self.motR, self.motSS])
-		# fitUnc = np.sqrt(np.diag(pcov))
+			Nsol = odeint(Nprime2, N0, t, args=(R, Gamma, beta))
+			return Nsol.ravel()
 
-		# # # set deload rate constants
-		# self.betaf, self.betafErr = popt[1], fitUnc[1]
-		# self.deloadFit = deloadModel(self.deloadTime - self.deloadTime[0], *popt)
+		R,dR         = self.initMOTR, self.initMOTR*0.1
+		Gamma,dGamma = self.motR, self.motR*0.1
+		N0,dN0       = self.motSS, self.motSS*0.05
+		beta         = 10	#TODO: what's a good initial guess?
 		
-	
+		params2 = create_params(R	  = dict(value=R, min=R-dR, max=R+dR),
+								Gamma = dict(value=Gamma, min=Gamma-dGamma, max=Gamma+dGamma),
+								N0    = dict(value=N0, min=N0-dN0, max=N0+dN0),
+								beta  = dict(value=beta, min=0, max=np.inf)
+								)
+
+		y = self.deloadVoltage		# TODO: do we want to fit to only the start of the deloading curve
+		x = self.deloadTime - self.deloadTime.min()
+
+		y = [b for (a,b) in sorted(zip(x,y), key=lambda pair: pair[0])]
+		x = sorted(x)
+
+		model = Model(N2)
+		result = model.fit(y, t=x, params=params2)
+  		
+		self.deloadFit = result.best_fit
+		self.betaPA, self.betaPAErr = result.params['beta'].value , result.params['beta'].stderr
+		
+	def plotDeloadFit(self, run_path):
+		plt.scatter(self.deloadTime, self.deloadVoltage, s=0.5)
+		plt.plot(self.deloadTime, self.deloadFit, 'r-', label='best fit')
+		plt.legend()
+		plt.savefig(os.path.join(run_path, 'TwoBodyFit.png'), dpi=200)
+		plt.close()
 	def setAll(self, timeBuffer):
 		'''
 		Sets all of the relevant parameters, as well as the 'ratio' variable, which is the recaptured fraction
@@ -750,10 +776,10 @@ class MTdataHost:
 		self.setBaseline(timeBuffer)
 
 		self.setLoading(timeBuffer)
+		self.initFit, self.initX = self.setInitialLoad(timeBuffer)
 		self.setDeloading(timeBuffer)   # TODO: currently just stores the deloading times and voltages
 		self.setReloadVolt(timeBuffer)
 
-		self.initFit, self.initX = self.setInitialLoad(timeBuffer)
 
 		# steady state ratio fraction
 		self.ratio = self.reloadVolt / self.motSS
@@ -780,15 +806,26 @@ class MTdataHost:
 		for key,value in self.__dict__.items():
 			if not hasattr(value, '__iter__') and not callable(value):  # don't store any iterables and functions
 				dataDict[key] = value
-	
+
+		resultDictPath = os.path.join(dirName, self.resultFile)
+
+		if os.path.exists(resultDictPath):				
+			dictStored = open(resultDictPath, 'r').read()
+			if dictStored == 'MAT fit failed':
+				dictStored = {}
+			else:
+				dictStored = eval(open(resultDictPath, 'r').read())
+			dictStored.update({key: value for key, value in dataDict.items()})
+			dataDict = dictStored
+		
 		if store:
-			with open(os.path.join(dirName, self.resultFile), 'w') as f:
+			with open(resultDictPath, 'w') as f:
 				f.write(str(dataDict))
 
 		return dataDict
 	
 	def storeFits(self, dirName, combined=True, separate=False):
-		import matplotlib.pyplot as plt
+		
 		
 		if combined:
 			plt.scatter(self.time, self.voltage, s=0.1)

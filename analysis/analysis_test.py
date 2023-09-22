@@ -11,6 +11,11 @@ from multiprocessing import Pool
 from tqdm import tqdm
 
 import scipy.constants as spc
+from lmfit import Model, create_params
+
+from scipy.integrate import odeint
+from scipy.optimize import curve_fit
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -138,6 +143,21 @@ def dump():
 	plt.xlabel('Pump Amplitude')
 	plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
 	plt.title(fr"$\delta $ ={180-2*df['pump_AOM_freq'].mean()}")
+ 
+	#* Plotting 2 body decay rate
+	dfs = [df for df in groups.values()]
+
+	for i, df  in enumerate(dfs[:]):
+			data = df
+			freqs = ((384182.5-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+			betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
+			freqs = sorted(freqs)
+			plt.plot(freqs, betaPAs, 'o-', ms=5, label=f"Pump Ampitude={df.iloc[10]['pump_reference']:.2f}")
+	plt.legend()
+	plt.xlabel(r'$\Delta$ (GHz)')
+	plt.ylabel(r'$\beta_{\mathrm{eff}}$ ')
+	plt.savefig(join(MEASURE_FOLDER, 'betaVsFreq.png'), dpi=200)  
+
 	#*-----------------------
 	#* MULTIPLE MEGARUN
 	#*-----------------------
@@ -249,17 +269,52 @@ def freq_misc():
 	plt.title('Levels plot')
 	
 	m, b, fit_line = my_linear_fit(x, y)
-def save_fit_results(run_path, plot=False):
+def save_fit_results(run_path, plot=False, bkfile=False, 
+					 CATbaseline=True, MOTbaseline=True,
+					 initRFit=True, loadFit=True,deloadFit=True,reloadFit=True,
+					 storeFitResults=True):
 	filename = os.path.join(run_path, 'data.csv')
 	bkfilename = os.path.join(run_path, 'data_oldPD.csv')
 	settingsname = os.path.join(run_path, 'Settings.txt')
 	
 	dataHost = MTdataHost(SAMPLE_RATE)
 	dataHost.loadCATdata(fileName=filename, settingsName=settingsname)
-	dataHost.CATbackgroundData(bkfilename)
 	
-	dataHost.setAllCAT(0.002)
-	resultDict = dataHost.getResults(run_path, store=True)
+	if bkfile:
+		dataHost.CATbackgroundData(bkfilename)
+	
+	#dataHost.setAllCAT(0.002)
+	if CATbaseline:
+		dataHost.setCATbaseline(0.002)
+	if MOTbaseline:
+		dataHost.setBaseline(0.002)
+	if loadFit:
+		dataHost.setLoading(0.002)
+	if initRFit and loadFit:
+		dataHost.initFit, dataHost.initX = dataHost.setInitialLoad(0.002)
+	if deloadFit:
+		dataHost.setDeloading(0.002)
+		dataHost.plotDeloadFit(run_path)# TODO: currently just stores the deloading times and voltages
+	if reloadFit:
+		dataHost.setReloadVolt(0.002)
+
+	if CATbaseline and MOTbaseline and loadFit and reloadFit:
+	# steady state ratio fraction
+		dataHost.ratio = dataHost.reloadVolt / dataHost.motSS
+
+		dataHost.ratioErr = dataHost.ratio * ((dataHost.reloadVoltErr/dataHost.reloadVolt)**2 + (dataHost.motSSErr/dataHost.motSS)**2)**(0.5)
+	
+		# if abs(dataHost.ratioErr / dataHost.ratio) > 0.1:
+		#     dataHost.ratioErr = abs(0.015*dataHost.ratio)
+		if dataHost.ratioErr < 0.001:
+			dataHost.ratioErr = 0.001
+		if dataHost.ratio < 0:
+			dataHost.ratio = 0
+			
+		# TODO: this information is useless
+	print('File loaded: RFmin = {} MHz, t_mt = {:.3f} s.'.format(dataHost.settings['fmin'], dataHost.settings['wait_mtrap']))
+	
+	resultDict = dataHost.getResults(run_path, store=storeFitResults)
  
 	if plot:
 		dataHost.storeFits(run_path, combined=True, separate=True)
@@ -337,7 +392,6 @@ def extract_fit(run_path, plot=True, cache_failed=True, cache_all=True):
 	return fit_results, settings, timestamp
 
 
-
 def get_row(run_path, **kwargs):
 			
    fit_results, settings, timestamp = extract_fit(run_path, **kwargs)
@@ -366,7 +420,6 @@ def get_data_frame(data_dir, parallel=True, in_process_run=False, **kwargs):
 	else:
 		for run_path in tqdm(run_path_arr):
 		   rows.append(get_row(run_path, **kwargs))
-
 	return pd.DataFrame.from_dict(rows)
 
 def add_wavemeter_data(df, wmeter_csv_path, window_size=100, num_rows=50):
