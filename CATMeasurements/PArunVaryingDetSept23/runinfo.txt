@@ -1,0 +1,1 @@
+Run to test detuning dependence of 2-body rate, now at some lower CAT ampl(0.3), and with finer current scan. Starting freq: 384182.9 . DATE = 22Sep2023

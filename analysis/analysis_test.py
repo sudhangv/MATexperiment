@@ -74,6 +74,7 @@ def dump():
 	dfs = [get_data_frame(measure_folder) for measure_folder in folders]
 
 	max_freqs = [384182.6]*len(dfs)
+	zipped_data = list(zip(dfs, max_freqs))
 	for i, (df, max_freq)  in enumerate(zipped_data[:]):
 		fig, ax = plt.subplots()
 		data = df.dropna()
@@ -108,77 +109,91 @@ def dump():
 	#*-----------------------
 	#* MEGA_RUN
  	#*-----------------------	
-	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPARunMega')
-	df = get_data_frame(MEASURE_FOLDER)
-	df.dropna(inplace=True)
+	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'MegaRuns', 'testPArunMega3')
+	df = get_data_frame(MEASURE_FOLDER,
+						plot=False,
+						cache_all=True)
+	dfc= df.copy()
+	#df.dropna(inplace=True)
 
-	df_grouped = df.groupby(by='pump_reference')
+	groupbyKey = 'pump_reference'
+	titleKey = 'pump_AOM_freq'
+
+	df_grouped = df.groupby(by=groupbyKey)
 	min_ratios = df_grouped['ratio'].min()
 
 	groups = dict(list(df_grouped))
 	dfs = [df for df in groups.values()]
- 
-	max_freqs = [384182.5]*15
-	#max_freqs=[384178.599, 384179.091, 384184.733]
+
+	# plotting ratio vs freq
+	max_freqs = [384182.5]*len(dfs)
 	zipped_data = list(zip(dfs, max_freqs))
 	fig, ax = plt.subplots()
 	for i, (df, max_freq)  in enumerate(zipped_data[:]):
-		data = df.dropna()
+		data = df
 		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
-		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.0, ms=5, figsize=(10, 10), label=f"Pump Amplituide = { df.iloc[10]['pump_reference'] :.2f}", linewidth=2.5)
+		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.0, ms=5, figsize=(10, 10), label=f"{groupbyKey} = { data.iloc[10][groupbyKey] :.2f}", linewidth=2.5)
 
 	plt.legend()
-
 	plt.savefig(os.path.join(MEASURE_FOLDER, 'lossFeatures.png'))
- 
-	x = [(180-2*df['pump_AOM_freq'].mean()) for df in dfs]
+	plt.title(f'Loss Features, {titleKey} = {data[titleKey].mean():.2f}', **titledict)
+	plt.show()
+	plt.close()
+	#---------------------------------------------------
+	x = [df[groupbyKey].mean() for df in dfs]
 	y = [(df['ratio'].max() - df['ratio'].min()) for df in dfs]
-	plt.plot( x, y ,'-o', label=fr"$\delta$ = {180 - 2*dfs[0]['pump_AOM_freq'].mean()} MHz")
-	plt.xlabel(r'$\delta$ (MHz)')
+	plt.plot( x, y ,'-o')
+	plt.xlabel(groupbyKey)
 	plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
- 
-	x = [df['pump_reference'].mean() for df in dfs]
-	y = [(df['ratio'].max() - df['ratio'].min()) for df in dfs]
-	plt.plot( x, y ,'-o', label=f"Pump Amplitude = {df['pump_reference'].mean()}")
-	plt.xlabel('Pump Amplitude')
-	plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
-	plt.title(fr"$\delta $ ={180-2*df['pump_AOM_freq'].mean()}")
- 
+	plt.title(f'SNR Plot, {titleKey} = {df[titleKey].mean():.2f}', **titledict)
+	plt.show()
+	plt.savefig(join(MEASURE_FOLDER, 'SNRplot.png'), dpi=200)
+	plt.close()
+
+	#---------------------------------------------------
 	#* Plotting 2 body decay rate
-	dfs = [df for df in groups.values()]
+	#dfs = [df for df in groups.values()]
 
 	for i, df  in enumerate(dfs[:]):
 			data = df
 			freqs = ((384182.5-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
 			betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
 			freqs = sorted(freqs)
-			plt.plot(freqs, betaPAs, 'o-', ms=5, label=f"Pump Ampitude={df.iloc[10]['pump_reference']:.2f}")
+			plt.plot(freqs, betaPAs, 'o-', ms=5, label=f"{groupbyKey}={data.iloc[10][groupbyKey]:.2f}")
 	plt.legend()
 	plt.xlabel(r'$\Delta$ (GHz)')
 	plt.ylabel(r'$\beta_{\mathrm{eff}}$ ')
-	plt.savefig(join(MEASURE_FOLDER, 'betaVsFreq.png'), dpi=200)  
-
+	plt.savefig(join(MEASURE_FOLDER, 'betaVsFreq.png'), dpi=200) 
+	plt.title(f'2-body Decay Plot, {titleKey} = {df[titleKey].mean():.2f}', **titledict) 
+	plt.show()
+	plt.close()
 	#*-----------------------
 	#* MULTIPLE MEGARUN
 	#*-----------------------
  
-	folders = [os.path.join(EXP_FOLDER, path ) for path in ['testPArunMega', 'testPArunMega2']]
-	dfs_mega = [get_data_frame(measure_folder, cache_all=True).dropna() for measure_folder in folders]
+	folders = [os.path.join(EXP_FOLDER, 'MegaRuns', path ) for path in ['testPArunMega7', 'testPArunMega8']]
 
-	dfs_grouped = [df_mega.groupby(by='pump_reference') for df_mega in dfs_mega]
+	dfs_mega = [get_data_frame(measure_folder, cache_all=True) for measure_folder in folders]
+
+	groupbyKey = 'pump_reference'
+	titleKey = 'pump_AOM_freq'
+
+	dfs_grouped = [df_mega.groupby(by=groupbyKey) for df_mega in dfs_mega]
 	min_ratios = [df_grouped['ratio'].min() for df_grouped in dfs_grouped]
 
 	groupss = [dict(list(df_grouped)) for df_grouped in dfs_grouped]
 	dfs = [ [df for df in groups.values()] for groups in groupss]
  
 	for row in dfs:
-		x = [df['pump_reference'].mean() for df in row]
-		y = [(df['ratio'].max() - df['ratio'].min())/df['motSS'].std() for df in row]
-		plt.plot( x, y ,'-o', label=fr"$\delta$ = {180 - 2*row[0]['pump_AOM_freq'].mean()} MHz")
-		plt.xlabel('Pump Amplitude')
-		plt.ylabel(r'SNR $ = \frac{V_{ss, off} - V_{ss, on}}{\sigma_{V,off}}$ ')
+		data = row[3]
+	
+		freqs = ((384182.5-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+		betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
+		freqs = sorted(freqs)
+		plt.plot(freqs, betaPAs, 'o-', ms=5, label=f"{titleKey}={data.iloc[10][titleKey]:.2f}")
+		plt.title(f'{groupbyKey} = {data.iloc[10][groupbyKey]:.2f}')
 	plt.legend()
- 
+	
 	#*-----------------------
 	#* FULL RUNS
 	#*-----------------------

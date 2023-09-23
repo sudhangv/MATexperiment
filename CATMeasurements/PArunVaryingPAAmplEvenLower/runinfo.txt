@@ -1,0 +1,1 @@
+Run to test PA beam power dependence of loss feature, with super duper low powers than recent test. Starting freq: 384182.9 . DATE = 22Sep2023
