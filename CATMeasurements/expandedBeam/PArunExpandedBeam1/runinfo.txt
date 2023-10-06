@@ -1,0 +1,1 @@
+Run to see dependence on detuning more closely,  expanded beam , two PA powers, and with normal current scan. Starting freq: 384182.55 . DATE = 24Sep2023

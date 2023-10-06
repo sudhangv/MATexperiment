@@ -41,11 +41,7 @@ WDATA_FOLDER =os.path.join(MEASURE_FOLDER, 'testPArun16.csv')
 
 # TODO: maybe make a run analysis class out of this?
 def dump():
-	fig, ax = plt.subplots()
-	plot_results(ax, df, max_freq= 384219., fmt='o', mfc='red', save_folder=MEASURE_FOLDER)
-	plt.savefig(os.path.join(MEASURE_FOLDER, 'ratio_vs_freq.png'))
 
-	
 	collect_plots(MEASURE_FOLDER, os.path.join(MEASURE_FOLDER, 'collected_plots'), 'deloadPhase.png')
  
 	#*-----------------------
@@ -54,32 +50,60 @@ def dump():
   
 	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArun9')
 	df = get_data_frame(MEASURE_FOLDER)
+	df.drop(columns=['betaPAErr'], inplace=True)
 	df.dropna(inplace=True)
 	#freqs = plot_results(df, 384201., save_folder=MEASURE_FOLDER)
  
-	data = df.dropna()
-	freqs = ((384201-PUMP_FREQUENCY)-(data['tempV']-df['tempV'].min())*FREQVSVOLT- (data['currV']-df['currV'].min())*FREQVSCURR)
+	max_freq = 384182.5
+	data = df
+ 
+	freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-df['currV'].min())*FREQVSCURR)
 	fig, ax = plt.subplots()
 	plot_spline_fit(ax=ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'], 
-				 s=0.1, save_folder=MEASURE_FOLDER, 
+				 s=0.0, save_folder=MEASURE_FOLDER, 
 				 mfc='red', color='black', 
-				 title='Trap Depth = 1.99 K')
+				 title='')
+	plt.show()
+	plt.close()
  
-	# *-----------------------
+	betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
+	freqs = sorted(freqs)
+	plt.plot(freqs, betaPAs, 'o-', ms=5, label="")
+	plt.legend()
+	plt.xlabel(r'$\Delta$ (GHz)')
+	plt.ylabel(r'$\beta_{\mathrm{eff}}$ ')
+	#plt.savefig(join(MEASURE_FOLDER, 'betaVsFreq.png'), dpi=200) 
+	plt.title(f"2-body Decay Plot {''} ", **titledict) 
+	plt.show()
+	plt.close()
+ 
+ 	# *-----------------------
 	# * MULTIPLE RUN COMPARISON
  	# *-----------------------
-	folders = [os.path.join(EXP_FOLDER, path ) for path in ['PArunHalfVarDet1', 'testPAVaryingCATampl']]
+	names = ['wide1', 'medium1', 'small1', 'smallest1']
+	folders = [os.path.join(EXP_FOLDER,'RepumpTrapDepthEffect', path) for path in names ]
 	dfs = [get_data_frame(measure_folder) for measure_folder in folders]
 
-	dfs = [get_data_frame(measure_folder) for measure_folder in folders]
+	labels = names
 
 	max_freqs = [384182.6]*len(dfs)
 	zipped_data = list(zip(dfs, max_freqs))
+	fig, ax = plt.subplots()
 	for i, (df, max_freq)  in enumerate(zipped_data[:]):
-		fig, ax = plt.subplots()
 		data = df.dropna()
 		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
-		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'], scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.00, ms=5, save_folder=join(folders[i]))
+		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'], scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.00, ms=5, label=labels[i])
+	plt.legend()
+ 
+	fig, ax = plt.subplots()
+	for i, (df, max_freq)  in enumerate(zipped_data[:]):
+		data = df.dropna()
+		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+		betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
+		freqs = sorted(freqs)
+		plt.plot(freqs, betaPAs, 'o-', ms=5, label=labels[i])
+	plt.legend()
+
 
 	#*-----------------------
 	#* PARSING WAVEMETER DATA
@@ -92,20 +116,11 @@ def dump():
 	levels = staircase_fit(data)
 
 	data = get_data_frame(MEASURE_FOLDER)
+ 
 	data.dropna(inplace=True)
 	freqs = ((max_freq)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
 	plt.plot(freqs)
  
-	#*-----------------------
-	#* GETTING DEPTH_RATIO DATAFRAME
- 	#*-----------------------
-	MEASURE_FOLDER = r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\relScatRate'
-	depth_ratios_df = get_rel_scattering_df(MEASURE_FOLDER)
-	df_slice = depth_ratios_df[(depth_ratios_df['pa1']==1.85) & (depth_ratios_df['pd1']==84) & (depth_ratios_df['pd2'] == 84)]
-	x = df_slice['pa2']
-	y = df_slice['depth_ratio']
-	plt.plot(x,y, 'o')
-
 	#*-----------------------
 	#* MEGA_RUN
  	#*-----------------------	
@@ -113,8 +128,9 @@ def dump():
 	df = get_data_frame(MEASURE_FOLDER,
 						plot=False,
 						cache_all=True)
-	dfc= df.copy()
-	#df.dropna(inplace=True)
+	df.drop(columns=['betaPAErr'])
+	df.dropna(inplace=True)
+	df = df[df['ratio']<1.2]
 
 	groupbyKey = 'pump_reference'
 	titleKey = 'pump_AOM_freq'
@@ -151,15 +167,13 @@ def dump():
 	plt.close()
 
 	#---------------------------------------------------
-	#* Plotting 2 body decay rate
-	#dfs = [df for df in groups.values()]
 
 	for i, df  in enumerate(dfs[:]):
-			data = df
-			freqs = ((384182.5-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
-			betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
-			freqs = sorted(freqs)
-			plt.plot(freqs, betaPAs, 'o-', ms=5, label=f"{groupbyKey}={data.iloc[10][groupbyKey]:.2f}")
+		data = df
+		freqs = ((max_freqs[0]-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+		betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
+		freqs = sorted(freqs)
+		plt.plot(freqs, betaPAs, 'o-', ms=5, label=f"{groupbyKey}={data.iloc[10][groupbyKey]:.2f}")
 	plt.legend()
 	plt.xlabel(r'$\Delta$ (GHz)')
 	plt.ylabel(r'$\beta_{\mathrm{eff}}$ ')
@@ -197,45 +211,98 @@ def dump():
 	#*-----------------------
 	#* FULL RUNS
 	#*-----------------------
-	
-	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'testPArunFull4')
+	MEASURE_FOLDER = os.path.join(EXP_FOLDER, 'CATrunOct4')
 	df = get_data_frame(MEASURE_FOLDER)
+	df.drop(columns='betaPAErr', inplace=True)
 	df.dropna(inplace=True)
 
 	dfc = df.copy()
 	df_grouped = df.groupby(by=['pump_reference', 'pump_AOM_freq'])
 	groups = dict(list(df_grouped))
 	dfs = [df for df in groups.values()]
- 
-	max_freqs = [384182.8]*30
+
+	max_freqs = [384394.7]*len(dfs)
 	zipped_data = list(zip(dfs, max_freqs))
-	fig1, ax1s = plt.subplots(4)
-	fig2, ax2s = plt.subplots(5)
+	num1 = 3
+	fig1, ax1s = plt.subplots(num1)    # detuning
+	fig1b, ax1sb = plt.subplots(num1)
+	fig1size = (8, num1*6)
+	fig1bsize= fig1size
+	fig1b.set_size_inches(fig1bsize)
+
+	num2 = 2
+	fig2, ax2s = plt.subplots(num2) # pump_reference
+	fig2b, ax2sb = plt.subplots(num2)
+	fig2size = (8, num2*6)
+	fig2bsize= fig2size
+	fig2b.set_size_inches(fig2bsize)
+
 	for i, (df, max_freq)  in enumerate(zipped_data[:]):
-		j1 = i%4
-		j2 = i//4
+		j1 = i%num1
+		j2 = i//num1
 		
 		data = df.dropna()
+		data = data[data['ratio'] < 1.3]
 		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-0.0)*FREQVSCURR)
-		ax2s[j2] = plot_spline_fit(ax2s[j2], x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i%4}', mfc=f'C{i%4}',color=f'C{i%4}', s=0.0, ms=5, figsize=(5, 25), linewidth=1.5, label=f"Detuning  = { 180-2*df.iloc[10]['pump_AOM_freq'] :.2f}", fig=fig2)
-		ax2s[j2].set_title(f"Pump Amplituide = { df.iloc[10]['pump_reference'] :.2f}", **titledict)
-		ax2s[j2].legend()
 		
-		ax1s[j1] = plot_spline_fit(ax1s[j1], x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i//4}', mfc=f'C{i//4}',color=f'C{i//4}', s=0.0, ms=5, figsize=(5, 25), linewidth=1.5, label=f"Pump Amplitude = { df.iloc[10]['pump_reference'] :.2f}", fig=fig1)
-		ax1s[j1].set_title(f"Detuning  = { 180-2*df.iloc[10]['pump_AOM_freq'] :.2f}", **titledict)
+		pref = data['pump_reference'].mean()
+		detuning = 180-2*data['pump_AOM_freq'].mean()
+		print(pref, detuning)
+		
+		
+		ax1s[j1] = plot_spline_fit(ax1s[j1], 
+								x=freqs, y=data['ratio'], yerr=data['ratioErr']
+								,scolor=f'C{j2}', mfc=f'C{j2}',color=f'C{j2}'
+								,s=0.0, ms=5,linewidth=1.5, figsize=fig1size
+								,label=f"Pump Amplitude = {pref:.2f}", fig=fig1)
+		
+		ax1s[j1].set_title(f"Detuning  = {detuning:.2f}", **titledict)
 		ax1s[j1].legend()
 		
+		ax2s[j2] = plot_spline_fit(ax2s[j2], 
+								x=freqs, y=data['ratio'], yerr=data['ratioErr'],
+								scolor=f'C{j1}', mfc=f'C{j1}',color=f'C{j1}', 
+								s=0.0, ms=5, linewidth=1.5, figsize=fig2size,
+								label=f"Detuning  = {detuning:.2f}", fig=fig2)
+		
+		ax2s[j2].set_title(f"Pump Amplitude = { pref:.2f}", **titledict)
+		ax2s[j2].legend()
+		
+		
+		betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
+		freqs = sorted(freqs)
+		
+		ax1sb[j1].plot(freqs, betaPAs, 'o-', color=f'C{j2}', ms=5,  label=f"Pump Amplitude = {pref:.2f}")
+		ax1sb[j1].set_xlabel(r'$\Delta$ (GHz)')
+		ax1sb[j1].set_ylabel(r'$\beta_{\mathrm{eff}}$ ')
+		ax1sb[j1].legend()
+		ax1sb[j1].set_title(f"Detuning  = {detuning:.2f}", **titledict)
+		
+		ax2sb[j2].plot(freqs, betaPAs, 'o-',color=f'C{j1}', ms=5, label=f"Detuning  = {detuning:.2f}")
+		ax2sb[j2].set_xlabel(r'$\Delta$ (GHz)')
+		ax2sb[j2].set_ylabel(r'$\beta_{\mathrm{eff}}$ ')
+		ax2sb[j2].legend()
+		ax2sb[j2].set_title(f"Pump Amplitude = { pref:.2f}", **titledict)
+		
 	fig1.tight_layout()
+	fig1b.tight_layout()
 	fig2.tight_layout()
+	fig2b.tight_layout()
 
 	fig1.savefig(os.path.join(MEASURE_FOLDER, 'lossFeaturesDet.png'))
 	plt.show()
 	plt.close()
-
-	fig2.savefig(os.path.join(MEASURE_FOLDER, 'lossFeaturesPA.png'))
+	fig1b.savefig(os.path.join(MEASURE_FOLDER, '2bodyDet.png'))
 	plt.show()
 	plt.close()
-	
+
+	fig2.savefig(os.path.join(MEASURE_FOLDER, 'lossFeaturesPampl.png'))
+	plt.show()
+	plt.close()
+	fig2b.savefig(os.path.join(MEASURE_FOLDER, '2BodyPampl.png'))
+	plt.show()
+	plt.close()
+
 	SNRdata = df_grouped['ratio'].max() - df_grouped['ratio'].min()
 	SNRdf = SNRdata.reset_index()
 	SNRdf.columns = ['pump_reference', 'pump_AOM_freq', 'SNR']
@@ -340,7 +407,7 @@ def get_timestamp(run_path):
 	timestamp = datetime.strptime(os.path.split(run_path)[-1].split('_')[0], dateformat)
 	return timestamp
 
-def extract_fit(run_path, plot=True, cache_failed=True, cache_all=True):
+def extract_fit(run_path, plot=True, cache_failed=True, cache_all=True, **kwargs):
 	"""Gather relevant data from each measurement run
 
 	Args:
@@ -370,7 +437,7 @@ def extract_fit(run_path, plot=True, cache_failed=True, cache_all=True):
 	if not os.path.exists(MAT_fit_cache_path) or not cache_all:
 		
 		try: 
-			fit_results, settings = save_fit_results(run_path, plot=plot)
+			fit_results, settings = save_fit_results(run_path, plot=plot, **kwargs)
 		except Exception as e:
 			print(traceback.format_exc())
 			print("Fitting ERROR at ", os.path.basename(run_path), '\n')
@@ -508,7 +575,7 @@ def plot_spline_fit(ax, x, y, s=1, yerr=None, color='black', scolor='black',figs
 		fig.set_dpi(dpi)
 		fig.set_size_inches(figsize)
 	if yerr is not None:
-		ax.errorbar(x, y, yerr=yerr, fmt='o', **kwargs)
+		ax.errorbar(x, y, yerr=yerr, fmt='o', color=color, **kwargs)
 	else:
 		ax.plot(x,y, 'o', **kwargs)
 	ax.plot(xnew, ynew, '-', color=scolor, alpha=alpha, label=label, **kwargs)
@@ -613,7 +680,64 @@ def load_single_run(run_path):
 	
 	return dh1
 	
+def load_mega_run(MEASURE_FOLDER, groupbyKey, titleKey, plot=True, save_plots=False, max_freq=384182.5, **kwargs):
+	# TODO: use the plot flag to do something?
+	
+	df = get_data_frame(MEASURE_FOLDER,
+						**kwargs)
+	dfc= df.copy()
+	#df.dropna(inplace=True)
 
+	df_grouped = df.groupby(by=groupbyKey)
+	min_ratios = df_grouped['ratio'].min()
+
+	groups = dict(list(df_grouped))
+	dfs = [df for df in groups.values()]
+
+	# plotting ratio vs freq
+	max_freqs = [max_freq]*len(dfs)
+	zipped_data = list(zip(dfs, max_freqs))
+	fig1, ax = plt.subplots()
+	for i, (df, max_freq)  in enumerate(zipped_data[:]):
+		data = df
+		freqs = ((max_freq-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+		ax=plot_spline_fit(ax, x=freqs, y=data['ratio'], yerr=data['ratioErr'],scolor=f'C{i}', mfc=f'C{i}',color=f'C{i}', s=0.0, ms=5, figsize=(10, 10), label=f"{groupbyKey} = { data.iloc[10][groupbyKey] :.2f}", linewidth=2.5)
+
+
+	plt.legend()
+	
+	plt.title(f'Loss Features, {titleKey} = {data[titleKey].mean():.2f}', **titledict)
+	plt.show()
+
+	#---------------------------------------------------
+	fig2 = plt.figure(2)
+	x = [df[groupbyKey].mean() for df in dfs]
+	y = [(df['ratio'].max() - df['ratio'].min()) for df in dfs]
+	plt.plot( x, y ,'-o')
+	plt.xlabel(groupbyKey)
+	plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
+	plt.title(f'SNR Plot, {titleKey} = {df[titleKey].mean():.2f}', **titledict)
+	plt.show()
+	
+	#---------------------------------------------------------
+	fig3=plt.figure(3)
+	for i, df  in enumerate(dfs[:]):
+		data = df
+		freqs = ((384182.5-PUMP_FREQUENCY)-(data['tempV']-data['tempV'].min())*FREQVSVOLT- (data['currV']-data['currV'].min())*FREQVSCURR)
+		betaPAs = [a for a,b in sorted(zip(data['betaPA'], freqs), key=lambda pair:pair[1])]
+		freqs = sorted(freqs)
+		plt.plot(freqs, betaPAs, 'o-', ms=5, label=f"{groupbyKey}={data.iloc[10][groupbyKey]:.2f}")
+	plt.legend()
+	plt.xlabel(r'$\Delta$ (GHz)')
+	plt.ylabel(r'$\beta_{\mathrm{eff}}$ ')
+	plt.title(f'2-body Decay Plot, {titleKey} = {df[titleKey].mean():.2f}', **titledict) 
+	plt.show()
+
+	if save_plots:
+		fig1.savefig(os.path.join(MEASURE_FOLDER, 'lossFeatures.png'))
+		fig2.savefig(join(MEASURE_FOLDER, 'SNRplot.png'), dpi=200)
+		fig3.savefig(join(MEASURE_FOLDER, 'betaVsFreq.png'), dpi=200) 
+	return dfc
 
 
 if __name__ == '__main__':

@@ -1,0 +1,1 @@
+Test with lower powers for new beam with PCX in front of PD. Starting freq: 384182.3 . DATE = 24Sep2023

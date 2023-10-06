@@ -1,4 +1,5 @@
 import os
+from os.path import join
 import sys
 from functools import partial
 sys.path.append(os.path.join(os.getcwd(), '..')) #adds directory below as valid path
@@ -8,6 +9,7 @@ from collections import deque
 import traceback
 from multiprocessing import Pool
 from tqdm import tqdm
+
 
 import scipy.constants as spc
 import matplotlib.pyplot as plt
@@ -123,36 +125,39 @@ def get_rel_scattering_df(data_folder, parallel=False, **kwargs):
 		with Pool(4) as p:
 			rows = list(tqdm(p.imap(partial(get_rel_scattering_row, **kwargs), run_path_couple_arr), total=len(run_path_couple_arr)))
 	
+	else:
+		rows = list(tqdm(get_rel_scattering(run_path1, run_path2, **kwargs) for run_path1,run_path2 in run_path_couple_arr))
 	depth_ratios_df = pd.DataFrame(rows)
 	
 	return depth_ratios_df
 
 def get_rel_scattering(run_path1, run_path2, **kwargs):
 	resultDict = {}
+	try:
+		resultDict1, scat_ratio1 = _load_single_run_rel_scat(run_path1, plot=True, **kwargs)
+		resultDict['scat_ratio1'] = scat_ratio1
+		resultDict2, scat_ratio2 = _load_single_run_rel_scat(run_path2, plot=True, **kwargs)
+		resultDict['scat_ratio2'] = 1/scat_ratio2
+		#print(f"scat_ratio 1, (2 inverted) = {scat_ratio1:.3f}, {1/scat_ratio2:.3f}")
+		#scat_ratio_avg = (scat_ratio1+1/scat_ratio2)/2
+		scat_ratio_avg = scat_ratio1
+		resultDict['scat_ratio_avg'] = scat_ratio_avg
 	
-	resultDict1, scat_ratio1 = _load_single_run_rel_scat(run_path1, plot=True, **kwargs)
-	resultDict['scat_ratio1'] = scat_ratio1
-	resultDict2, scat_ratio2 = _load_single_run_rel_scat(run_path2, plot=True, **kwargs)
-	resultDict['scat_ratio2'] = 1/scat_ratio2
-	#print(f"scat_ratio 1, (2 inverted) = {scat_ratio1:.3f}, {1/scat_ratio2:.3f}")
-	#scat_ratio_avg = (scat_ratio1+1/scat_ratio2)/2
-	scat_ratio_avg = scat_ratio1
-	resultDict['scat_ratio_avg'] = scat_ratio_avg
- 
-	Rratio = resultDict1['initMOTR']/resultDict2['initMOTR']
-	resultDict['Rratio'] = Rratio
-	#print(fr"Rratio = {resultDict1['initMOTR']:.3f} / {resultDict2['initMOTR']:.3f} = {Rratio:.3f}")
-	depthRatio = np.sqrt(Rratio/scat_ratio_avg)
-	
-	return resultDict1, resultDict2, resultDict, depthRatio
-
+		Rratio = resultDict1['initMOTR']/resultDict2['initMOTR']
+		resultDict['Rratio'] = Rratio
+		#print(fr"Rratio = {resultDict1['initMOTR']:.3f} / {resultDict2['initMOTR']:.3f} = {Rratio:.3f}")
+		depthRatio = np.sqrt(Rratio/scat_ratio_avg)
+		
+		return resultDict1, resultDict2, resultDict, depthRatio
+	except Exception as e:
+		return {}, {}, {}, 9999
 
 def _load_single_run_rel_scat(run_path, plot=False, cache_all=False):
 	filename = os.path.join(run_path, 'data.csv')
 	settingsname = os.path.join(run_path, 'Settings.txt')
 	
 	MAT_fit_cache_path = os.path.join(run_path, 'resultDict.txt')
-	fit_results = {}
+	fit_results, scat_ratio = {}, 99999
 	if not os.path.exists(MAT_fit_cache_path) or not cache_all:
 		
 		try: 
@@ -171,7 +176,27 @@ def _load_single_run_rel_scat(run_path, plot=False, cache_all=False):
 			#dh1.tCATbackground = dh1.tReload + dh1.timeReload 
 			dh1.tBaseline = dh1.tReload + dh1.timeReload
 			#dh1.setCATtiming()
-			dh1.setAllCAT(0.002)
+			#dh1.setAllCAT(0.002)
+			dh1.setCATbaseline(0.002)
+			dh1.setBaseline(0.002)
+
+			dh1.setLoading(0.002)
+			dh1.initFit, dh1.initX = dh1.setInitialLoad(0.002)
+			#dh1.setDeloading(0.002)   # TODO: currently just stores the deloading times and voltages
+			dh1.setReloadVolt(0.002)
+
+
+			# steady state ratio fraction
+			dh1.ratio = dh1.reloadVolt / dh1.motSS
+
+			dh1.ratioErr = dh1.ratio * ((dh1.reloadVoltErr/dh1.reloadVolt)**2 + (dh1.motSSErr/dh1.motSS)**2)**(0.5)
+			
+			# if abs(dh1.ratioErr / dh1.ratio) > 0.1:
+			#     dh1.ratioErr = abs(0.015*dh1.ratio)
+			if dh1.ratioErr < 0.001:
+				dh1.ratioErr = 0.001
+			if dh1.ratio < 0:
+				dh1.ratio = 0
 
 			#print('FITTINGGGGGGGGGGGG')
 			fit_results = dh1.getResults(run_path, store=True)
@@ -199,9 +224,14 @@ def _load_single_run_rel_scat(run_path, plot=False, cache_all=False):
 
 	
 	#scat_ratio = fit_results['motSS']/(fit_results['reloadVolt']+fit_results['baseVolt'] - (fit_results['CATbackgroundVolt']+fit_results['noLightBackground']))
-	scat_ratio = (fit_results['motSS']+fit_results['baseVolt']-(fit_results['CATbackgroundVolt']+fit_results['noLightBackground']))/(fit_results['reloadVolt'])
-	fit_results['scat_ratio'] = scat_ratio
- 	#scat_ratio = dh1.motSS/(dh1.reloadVolt+dh1.baseVolt - (dh1.CATbackgroundVolt+dh1.noLightBackground))
+	try:
+		scat_ratio = (fit_results['motSS']+fit_results['baseVolt']-(fit_results['CATbackgroundVolt']+fit_results['noLightBackground']))/(fit_results['reloadVolt'])
+		fit_results['scat_ratio'] = scat_ratio
+	except Exception as e:
+		print(e)
+		fit_results['scat_ratio'] = 999999
+		
+	#scat_ratio = dh1.motSS/(dh1.reloadVolt+dh1.baseVolt - (dh1.CATbackgroundVolt+dh1.noLightBackground))
 	
 	return fit_results, scat_ratio
 
@@ -221,3 +251,14 @@ def scat_rate(I, delta, gamma=6.065, Is=3.576):
 	den = 2*(1+I/Is+4*(delta/gamma)**2)
 
 	return num/den
+
+
+	#*-----------------------
+	#* GETTING DEPTH_RATIO DATAFRAME
+ 	#*-----------------------
+	# MEASURE_FOLDER = r'C:\Users\svars\OneDrive\Desktop\UBC Lab\CATExperiment\CATMeasurements\relScatRate'
+	# depth_ratios_df = get_rel_scattering_df(MEASURE_FOLDER)
+	# df_slice = depth_ratios_df[(depth_ratios_df['pa1']==1.85) & (depth_ratios_df['pd1']==84) & (depth_ratios_df['pd2'] == 84)]
+	# x = df_slice['pa2']
+	# y = df_slice['depth_ratio']
+	# plt.plot(x,y, 'o')

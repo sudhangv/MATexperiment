@@ -1,1 +1,0 @@
-testFullrun4 with varying detunings and pump amplitudes and now half the points. Test settings: 0.3 CAT ampl, test:1.85 pAmpl, 84MHz, 40s load time. Starting freq: 384182.8

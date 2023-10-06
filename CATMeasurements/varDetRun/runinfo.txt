@@ -1,0 +1,1 @@
+Varying pump detuning right after dispensation. Start freq= 384182.44. DATE = 26Sep2023

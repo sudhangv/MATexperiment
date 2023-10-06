@@ -1,0 +1,1 @@
+Run to check resonance frequnecy for PA. Starting Freq= 384182.27. DATE = 05Oct2023

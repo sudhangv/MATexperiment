@@ -1,0 +1,1 @@
+expanded beam modified slightly, testing at lower pump references = 0.76 still, but with lower CAT ref for better PID. DATE = 25Sep2023

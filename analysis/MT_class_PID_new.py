@@ -242,6 +242,7 @@ class MTdataHost:
 		# raise error if not found
 		except IndexError:
 			raise UserWarning('Offset not found.')
+			
 		except Exception as e:
 			#raise UserWarning(f'Other error {e}')
 			pass
@@ -281,6 +282,7 @@ class MTdataHost:
 		self.tLoad = self.offset + self.timeBaseline + self.timeBaseline + self.timeBaseline 
 		
 		self.tDeload = self.tLoad + self.timeLoad 
+		self.deloadFitTime = 10
 		self.tReload = self.tDeload + self.timeDeload
 			
 		#else:
@@ -423,6 +425,7 @@ class MTdataHost:
 			endInd = end1 + np.where(abs(np.diff(self.voltage[end1:end2]))>4*std)[0][0]-1
 		except Exception as e:
 			print(e)
+			print("Exception in setLoading :(")
 			endInd = end1 + 20
 		
 		self.loadingVoltage = self.voltage[startInd:endInd]
@@ -623,7 +626,7 @@ class MTdataHost:
 		tDeloadEnd = self.tReload   # if don't find offset, use settings for timing
 		# TODO: there definitely are better ways to do this
 		for i in range(indStart, indEnd):
-			if abs(self.voltage[i+1]-self.voltage[i]) > 5*self.std:
+			if abs(self.voltage[i+1]-self.voltage[i]) > 4*self.std:
 				tDeloadEnd = self.time[i+1]
 		
 		
@@ -636,9 +639,9 @@ class MTdataHost:
 		
 		linear_fit = False
 		tStart = self.setDeloadEnd(timeBuffer)
-		timeDiff = 75*timeBuffer
+		timeDiff = 25*timeBuffer
 		
-		tEnd = tStart + self.timeReload - 20*timeBuffer
+		tEnd = tStart + self.timeReload - 100*timeBuffer
 		#tEnd = self.setMTExEnd(tStart + 10*timeBuffer, tStart + self.timeTest + 10*timeBuffer)- 10*timeBuffer # added this to reduce range of fit, 80 for fast, 10 for slow
 		indStart, indEnd = self.getTimeInd(tStart+timeDiff), self.getTimeInd(tEnd) # 10 for fast
 		
@@ -702,41 +705,46 @@ class MTdataHost:
 		else:
 			self.deloadVoltage = self.voltage[startInd:endInd] - self.CATbackgroundVolt - self.baseVolt
    
-	
-		def N2(t, R, Gamma, beta, N0):
-        
-			def Nprime2(N, t, R, Gamma, beta):
-				return R - Gamma*N - beta*N**2
+		try:
+			def N2(t, R, Gamma, beta, N0):
+			
+				def Nprime2(N, t, R, Gamma, beta):
+					return R - Gamma*N - beta*N**2
 
-			Nsol = odeint(Nprime2, N0, t, args=(R, Gamma, beta))
-			return Nsol.ravel()
+				Nsol = odeint(Nprime2, N0, t, args=(R, Gamma, beta))
+				return Nsol.ravel()
 
-		R,dR         = self.initMOTR, self.initMOTR*0.1
-		Gamma,dGamma = self.motR, self.motR*0.1
-		N0,dN0       = self.motSS, self.motSS*0.05
-		beta         = 10	#TODO: what's a good initial guess?
+			R,dR         = self.initMOTR, self.initMOTR*0.01
+			#R,dR         = self.motR*self.motSS, self.motR*self.motSS*0.1
+			Gamma,dGamma = self.motR, self.motR*0.01
+			N0,dN0       = self.motSS, self.motSS*0.05
+			beta         = 1	#TODO: what's a good initial guess?
+			
+			params2 = create_params(R	  = dict(value=R, min=R-dR, max=R+dR),
+									Gamma = dict(value=Gamma, min=Gamma-dGamma, max=Gamma+dGamma),
+									N0    = dict(value=N0, min=N0-dN0, max=N0+dN0),
+									beta  = dict(value=beta, min=0, max=np.inf)
+									)
+			
+			y = self.deloadVoltage[:int(self.deloadFitTime*self.sampleRate)]		# TODO: do we want to fit to only the start of the deloading curve
+			x = self.deloadTime[:int(self.deloadFitTime*self.sampleRate)] 
+			x = x - x.min()
+
+			y = [b for (a,b) in sorted(zip(x,y), key=lambda pair: pair[0])]
+			x = sorted(x)
 		
-		params2 = create_params(R	  = dict(value=R, min=R-dR, max=R+dR),
-								Gamma = dict(value=Gamma, min=Gamma-dGamma, max=Gamma+dGamma),
-								N0    = dict(value=N0, min=N0-dN0, max=N0+dN0),
-								beta  = dict(value=beta, min=0, max=np.inf)
-								)
-
-		y = self.deloadVoltage		# TODO: do we want to fit to only the start of the deloading curve
-		x = self.deloadTime - self.deloadTime.min()
-
-		y = [b for (a,b) in sorted(zip(x,y), key=lambda pair: pair[0])]
-		x = sorted(x)
-
-		model = Model(N2)
-		result = model.fit(y, t=x, params=params2)
-  		
-		self.deloadFit = result.best_fit
-		self.betaPA, self.betaPAErr = result.params['beta'].value , result.params['beta'].stderr
-		
+			model = Model(N2)
+			result = model.fit(y, t=x, params=params2)
+			
+			self.deloadFit = result.best_fit
+			self.betaPA, self.betaPAErr = result.params['beta'].value , result.params['beta'].stderr
+		except Exception as e:
+			print(e)
+			print("Exception in deload Fit :(")
+   
 	def plotDeloadFit(self, run_path):
-		plt.scatter(self.deloadTime, self.deloadVoltage, s=0.5)
-		plt.plot(self.deloadTime, self.deloadFit, 'r-', label='best fit')
+		plt.scatter(self.deloadTime[:int(self.deloadFitTime*self.sampleRate)], self.deloadVoltage[:int(self.deloadFitTime*self.sampleRate)], s=0.5)
+		plt.plot(self.deloadTime[:int(self.deloadFitTime*self.sampleRate)], self.deloadFit, 'r-', label='best fit')
 		plt.legend()
 		plt.savefig(os.path.join(run_path, 'TwoBodyFit.png'), dpi=200)
 		plt.close()
@@ -861,9 +869,12 @@ class MTdataHost:
 			plt.savefig(os.path.join(dirName,'baselineFit.png'), dpi=200)
 			plt.close()
 			
-			plt.plot(self.deloadTime,self.deloadVoltage)
-			plt.savefig(os.path.join(dirName,'deloadPhase.png'), dpi=200)
-			plt.close()
+			try:
+				plt.plot(self.deloadTime,self.deloadVoltage)
+				plt.savefig(os.path.join(dirName,'deloadPhase.png'), dpi=200)
+				plt.close()
+			except Exception as e:
+				pass
 
 			ind1 = int(self.initTime[0]*2000)
 			ind2 = ind1 + len(self.initTime)

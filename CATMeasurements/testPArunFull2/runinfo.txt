@@ -1,3 +1,0 @@
-testPARunMega18 with varying detunings and pump amplitudes . test settings: 0.3 CAT ampl, test:1.85 pAmpl,84MHz, 40s load time.  
-
-After 9 AM on Sept 10 is sus.
