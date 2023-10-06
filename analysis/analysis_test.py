@@ -128,7 +128,7 @@ def dump():
 	df = get_data_frame(MEASURE_FOLDER,
 						plot=False,
 						cache_all=True)
-	df.drop(columns=['betaPAErr'])
+	df.drop(columns=['betaPAErr'], inplace=True)
 	df.dropna(inplace=True)
 	df = df[df['ratio']<1.2]
 
@@ -156,15 +156,15 @@ def dump():
 	plt.show()
 	plt.close()
 	#---------------------------------------------------
-	x = [df[groupbyKey].mean() for df in dfs]
-	y = [(df['ratio'].max() - df['ratio'].min()) for df in dfs]
-	plt.plot( x, y ,'-o')
-	plt.xlabel(groupbyKey)
-	plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
-	plt.title(f'SNR Plot, {titleKey} = {df[titleKey].mean():.2f}', **titledict)
-	plt.show()
-	plt.savefig(join(MEASURE_FOLDER, 'SNRplot.png'), dpi=200)
-	plt.close()
+	# x = [df[groupbyKey].mean() for df in dfs]
+	# y = [(df['ratio'].max() - df['ratio'].min()) for df in dfs]
+	# plt.plot( x, y ,'-o')
+	# plt.xlabel(groupbyKey)
+	# plt.ylabel(r'SNR $ = V_{ss, off} - V_{ss, on}$ ')
+	# plt.title(f'SNR Plot, {titleKey} = {df[titleKey].mean():.2f}', **titledict)
+	# plt.show()
+	# plt.savefig(join(MEASURE_FOLDER, 'SNRplot.png'), dpi=200)
+	# plt.close()
 
 	#---------------------------------------------------
 
@@ -580,8 +580,8 @@ def plot_spline_fit(ax, x, y, s=1, yerr=None, color='black', scolor='black',figs
 		ax.plot(x,y, 'o', **kwargs)
 	ax.plot(xnew, ynew, '-', color=scolor, alpha=alpha, label=label, **kwargs)
  
-	ax.set_ylabel(r'$\mathbf{\frac{V_{ss, cat}}{V_{ss}}} $ ', **labeldict)
-	ax.set_xlabel(r'$\Delta $ (GHz)', **labeldict)
+	ax.set_ylabel(r'$\mathbf{\frac{V_{ss, cat}}{V_{ss}}} $ ')
+	ax.set_xlabel(r'$\Delta $ (GHz)')
  
 	ax.set_title(title, **titledict)
 	if save_folder:
