@@ -1,0 +1,1 @@
+Var PAampl run for AOM freq = 87.0. Starting Freq= 384182.35 . DATE = 09Oct2023

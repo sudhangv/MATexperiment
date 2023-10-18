@@ -1,0 +1,4 @@
+1,2 cat on off for pampl=1.85 20s load
+3,4 cat on off for pampl=1.85 30s load
+5,6 cat on off for pampl = 1.00 30s load
+7 cat on for catampl=0.5
