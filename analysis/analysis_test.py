@@ -88,7 +88,7 @@ def save_fit_results(run_path, plot=False, bkfile=False,
 		dataHost.initFit, dataHost.initX = dataHost.setInitialLoad(0.002)
 	if deloadFit:
 		dataHost.setDeloading(0.002)
-		dataHost.plotDeloadFit(run_path)# TODO: currently just stores the deloading times and voltages
+		dataHost.plotDeloadFit(run_path)
 	if reloadFit:
 		dataHost.setReloadVolt(0.002)
 
