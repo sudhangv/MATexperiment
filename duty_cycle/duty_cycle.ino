@@ -20,8 +20,8 @@ typedef enum{
 #define OperationMode OffOff //operation of if there is overlap between the MOT and PA beam before/after the PA beam turns (On means an overlap, Off means a gap)
 
 float cycle_frequency = 1000;  //duty cycle frequency in Hz
-float MOT_uptime = 60;   //% of duty cycle where MOT is on (and thus PA beam is off)
-float PA_uptime = 40;    //% of duty cycle where MOT is on (and thus PA beam is off)
+float MOT_uptime = 90;   //% of duty cycle where MOT is on (and thus PA beam is off)
+float PA_uptime = 10;    //% of duty cycle where MOT is on (and thus PA beam is off)
 float PA_prefrac = 0.;   //% of duty cycle offset between end of MOT and start of PA
 float PA_postfrac = 0.;  //% of duty cycle offset between end of PA and start of MOT
 
